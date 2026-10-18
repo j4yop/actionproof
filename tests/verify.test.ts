@@ -43,7 +43,7 @@ describe("ActionProof verifier", () => {
     const result = verify(fixture!.contract, fixture!.evidence, context);
 
     expect(result.status).toBe("UNSAFE_BYPASS");
-    expect(result.summary.unsafe).toBe(1);
+    expect(result.summary.unsafe).toBe(2);
     expect(result.assertionResults.find((assertion) => assertion.assertionId === "no-privileged-bypass")?.evidenceEventIds).toContain("bypass");
   });
 

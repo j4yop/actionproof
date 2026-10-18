@@ -20,27 +20,14 @@ export function verify(contract: Contract, evidence: EvidenceBundle, context: Ve
   }
 
   const events = [...evidence.events].sort((left, right) => left.sequence - right.sequence);
-  const coverageIssues = getCoverageIssues(contract, evidence, events);
-  const assertionResults = contract.assertions.map((assertion) => evaluateAssertion(assertion, evidence, events));
-
-  if (coverageIssues.length > 0 && contract.capture.completeness === "required") {
-    for (const issue of coverageIssues) {
-      assertionResults.push({
-        assertionId: `coverage:${issue.code.toLowerCase()}`,
-        kind: "event-present",
-        required: true,
-        status: "not-evaluable",
-        reasonCode: issue.code,
-        evidenceEventIds: [],
-        expected: issue.message,
-      });
-    }
-  }
+  const assertionResults = [
+    ...contract.assertions.map((assertion) => evaluateAssertion(assertion, evidence, events)),
+    ...getPreflightResults(contract, evidence, events),
+  ];
 
   const explicitBlock = events.find((event) => isExplicitBlock(event));
   const status = classifyStatus(assertionResults, explicitBlock, evidence);
   const reasonCodes = uniqueStrings([
-    ...coverageIssues.map((issue) => issue.code),
     ...assertionResults.map((result) => result.reasonCode),
     ...(explicitBlock ? [REASON_CODES.EXPLICIT_POLICY_BLOCK] : []),
   ]);
@@ -207,26 +194,66 @@ function getMissingStatus(evidence: EvidenceBundle): AssertionResult["status"] {
   return evidence.coverage.mode === "complete" ? "failed" : "not-evaluable";
 }
 
-function getCoverageIssues(contract: Contract, evidence: EvidenceBundle, events: EvidenceEvent[]): Array<{ code: string; message: string }> {
-  const issues: Array<{ code: string; message: string }> = [];
+function getPreflightResults(contract: Contract, evidence: EvidenceBundle, events: EvidenceEvent[]): AssertionResult[] {
+  const results: AssertionResult[] = [];
   if (contract.capture.completeness === "required" && evidence.coverage.mode !== "complete") {
-    issues.push({ code: REASON_CODES.COVERAGE_INCOMPLETE, message: "The contract requires complete capture coverage." });
+    results.push(preflightResult("coverage:complete", "The contract requires complete capture coverage.", "not-evaluable", REASON_CODES.COVERAGE_INCOMPLETE));
   }
   if ((evidence.coverage.gaps?.length ?? 0) > 0) {
-    issues.push({ code: REASON_CODES.EVIDENCE_GAP, message: "The evidence bundle declares one or more sequence gaps." });
+    results.push(preflightResult("coverage:gaps", "The evidence bundle declares one or more sequence gaps.", "not-evaluable", REASON_CODES.EVIDENCE_GAP));
   }
   for (const eventType of contract.capture.requiredEventTypes ?? []) {
     if (!events.some((event) => event.type === eventType)) {
-      issues.push({ code: REASON_CODES.REQUIRED_EVENT_TYPE_MISSING, message: `Required event type \"${eventType}\" was not observed.` });
+      results.push(preflightResult(`coverage:event:${eventType}`, `Required event type \"${eventType}\" was not observed.`, evidence.coverage.mode === "complete" ? "failed" : "not-evaluable", REASON_CODES.REQUIRED_EVENT_TYPE_MISSING));
     }
   }
   if (contract.scope?.maxDurationMs !== undefined) {
     const duration = Date.parse(evidence.run.endedAt ?? evidence.run.startedAt) - Date.parse(evidence.run.startedAt);
     if (duration > contract.scope.maxDurationMs) {
-      issues.push({ code: REASON_CODES.DURATION_OUT_OF_RANGE, message: "The run exceeded the contract duration limit." });
+      results.push(preflightResult("scope:max-duration", "The run exceeded the contract duration limit.", "failed", REASON_CODES.DURATION_OUT_OF_RANGE));
     }
   }
-  return issues;
+  if (contract.scope?.allowedOrigins) {
+    const originEvents = events
+      .map((event) => ({ event, origin: getPath(event, "/payload/url/origin").value ?? getPath(event, "/payload/origin").value }))
+      .filter((entry): entry is { event: EvidenceEvent; origin: string } => typeof entry.origin === "string");
+    const violations = originEvents.filter(({ origin }) => !contract.scope?.allowedOrigins?.includes(origin));
+    if (violations.length > 0) {
+      results.push(preflightResult("scope:allowed-origins", "The trace contains an origin outside the contract scope.", "failed", REASON_CODES.ORIGIN_OUTSIDE_SCOPE, violations.map(({ event }) => event.eventId), {
+        expected: contract.scope.allowedOrigins,
+        observed: violations.map(({ origin }) => origin),
+      }));
+    }
+  }
+  if (contract.scope?.allowedCapabilities) {
+    const capabilityEvents = events
+      .map((event) => ({ event, capability: getPath(event, "/payload/capability").value }))
+      .filter((entry): entry is { event: EvidenceEvent; capability: string } => typeof entry.capability === "string");
+    const violations = capabilityEvents.filter(({ capability }) => !contract.scope?.allowedCapabilities?.includes(capability));
+    if (violations.length > 0) {
+      results.push(preflightResult("scope:allowed-capabilities", "The trace used a capability outside the contract scope.", "unsafe", REASON_CODES.CAPABILITY_OUTSIDE_SCOPE, violations.map(({ event }) => event.eventId), {
+        expected: contract.scope.allowedCapabilities,
+        observed: violations.map(({ capability }) => capability),
+      }));
+    }
+  }
+  if (contract.capture.integrity === "signed") {
+    results.push(preflightResult("provenance:signature", "The bundle declares a signature, but v1 has no trusted-key verifier configured.", "not-evaluable", REASON_CODES.SIGNATURE_UNVERIFIABLE));
+  }
+  return results;
+}
+
+function preflightResult(assertionId: string, description: string, status: AssertionResult["status"], reasonCode: string, evidenceEventIds: string[] = [], values: Pick<AssertionResult, "expected" | "observed"> = {}): AssertionResult {
+  return {
+    assertionId,
+    description,
+    kind: "event-present",
+    required: true,
+    status,
+    reasonCode,
+    evidenceEventIds,
+    ...values,
+  };
 }
 
 function isExplicitBlock(event: EvidenceEvent): boolean {
@@ -256,7 +283,6 @@ function summarize(results: AssertionResult[]): VerificationResult["summary"] {
 }
 
 function getProvenanceStatus(evidence: EvidenceBundle): VerificationResult["evidence"]["provenance"] {
-  if (evidence.provenance.signature && evidence.provenance.integrity.bundleHash) return "verified";
   if (evidence.provenance.integrity.chain === "event-hash-chain" || evidence.provenance.integrity.bundleHash) return "tamper-evident";
   return "unverified";
 }

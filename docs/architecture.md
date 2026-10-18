@@ -71,7 +71,9 @@ Evidence provenance therefore has three separate meanings:
 
 - `unverified`: no bundle hash, chain, or signature is present;
 - `tamper-evident`: a bundle hash or event chain is present;
-- `verified`: a bundle hash and signature are present in the submitted metadata.
+- `verified`: reserved for a future deployment with a configured trusted-key verifier. Presence of a signature field alone never earns this state in v1.
+
+Signed contracts are therefore fail-closed as `INCONCLUSIVE` until a trusted-key verifier is configured. ActionProof does not pretend that a self-reported signature is verified.
 
 The result makes this distinction visible instead of collapsing it into a security badge.
 
