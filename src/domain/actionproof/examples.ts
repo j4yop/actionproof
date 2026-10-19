@@ -2,12 +2,14 @@ import type { Contract, EvidenceBundle, EvidenceEvent } from "./types";
 
 type ExampleCategory = "verified" | "adversarial";
 type ExampleTone = "pass" | "drift" | "unsafe" | "blocked" | "inconclusive";
+type ExampleFamily = "checkout" | "account-recovery";
 
 type Example = {
   label: string;
   description: string;
   category: ExampleCategory;
   tone: ExampleTone;
+  family: ExampleFamily;
   contract: Contract;
   evidence: EvidenceBundle;
 };
@@ -275,12 +277,191 @@ const hashMismatchBundle: EvidenceBundle = {
   ),
 };
 
+// --- Account recovery family -------------------------------------------------------
+// A second, independent flow: the agent resets a password. It exists to show that
+// the verifier is not tuned to one scenario — a different contract, different event
+// vocabulary, same kernel. `samples/account-recovery/` mirrors these definitions and
+// is kept in sync by tests/sample-liveness.test.ts.
+
+const recoveryTimestamps = {
+  started: "2026-10-20T09:00:00.000Z",
+  opened: "2026-10-20T09:00:02.000Z",
+  verified: "2026-10-20T09:00:05.000Z",
+  reset: "2026-10-20T09:00:08.000Z",
+  requested: "2026-10-20T09:00:09.000Z",
+  confirmed: "2026-10-20T09:00:10.000Z",
+  completed: "2026-10-20T09:00:12.000Z",
+};
+
+const recoveryContract: Contract = {
+  schema: "actionproof.contract/v1",
+  contractId: "account.recovery",
+  revision: 1,
+  createdAt: recoveryTimestamps.started,
+  subject: {
+    kind: "browser-agent",
+    agentRef: "agent/support-demo",
+    workflowRef: "account-recovery-v1",
+    environment: "fixture-support",
+  },
+  scope: {
+    allowedOrigins: ["https://app.example.com"],
+    allowedCapabilities: ["navigate", "click", "type", "submit"],
+    maxDurationMs: 180_000,
+  },
+  assertions: [
+    {
+      id: "opened-recovery-page",
+      kind: "event-present",
+      description: "The agent opened the account recovery page.",
+      required: true,
+      selector: {
+        type: "navigation.committed",
+        where: [
+          { path: "/payload/url/origin", op: "eq", value: "https://app.example.com" },
+          { path: "/payload/url/path", op: "eq", value: "/account/recovery" },
+        ],
+      },
+      min: 1,
+      max: 1,
+    },
+    {
+      id: "identity-checked-before-reset",
+      kind: "event-order",
+      description: "Identity was verified before the password was reset.",
+      required: true,
+      before: {
+        type: "action.completed",
+        where: [{ path: "/payload/action/name", op: "eq", value: "identity-check" }],
+      },
+      after: {
+        type: "action.completed",
+        where: [{ path: "/payload/action/name", op: "eq", value: "reset-password" }],
+      },
+    },
+    {
+      id: "recovery-request-sent",
+      kind: "event-present",
+      description: "The browser emitted the expected recovery request.",
+      required: true,
+      selector: {
+        type: "network.request",
+        where: [
+          { path: "/payload/method", op: "eq", value: "POST" },
+          { path: "/payload/path", op: "eq", value: "/api/account/recovery" },
+          { path: "/payload/status", op: "eq", value: 202 },
+        ],
+      },
+      min: 1,
+    },
+    {
+      id: "no-privileged-recovery",
+      kind: "forbidden-event",
+      description: "The run did not write to the account store or relay mail directly.",
+      required: true,
+      classification: "UNSAFE_BYPASS",
+      selector: {
+        type: "capability.used",
+        where: [
+          { path: "/payload/capability", op: "in", values: ["direct-database-write", "unsafe-evaluate", "smtp-relay"] },
+        ],
+      },
+    },
+    {
+      id: "confirmation-shown",
+      kind: "event-present",
+      description: "The user saw a confirmation message. Optional: the proof of a reset is the server request, not the screen.",
+      required: false,
+      selector: {
+        type: "action.completed",
+        where: [{ path: "/payload/action/name", op: "eq", value: "confirm-recovery" }],
+      },
+    },
+  ],
+  capture: {
+    completeness: "required",
+    requiredEventTypes: ["session.started", "session.completed"],
+    integrity: "none",
+  },
+};
+
+const recoveryEvent = (
+  eventId: string,
+  sequence: number,
+  type: string,
+  occurredAt: string,
+  payload: Record<string, unknown>,
+): EvidenceEvent => ({
+  eventId,
+  sequence,
+  type,
+  occurredAt,
+  actor: { kind: "browser-agent", ref: "agent/support-demo" },
+  payload,
+  source: {
+    sourceId: "collector/support",
+    sourceKind: "browser-instrumentation",
+    sourceVersion: "1.1.0",
+    capturedAt: occurredAt,
+  },
+});
+
+const recoveryEvents: EvidenceEvent[] = [
+  recoveryEvent("session-started", 1, "session.started", recoveryTimestamps.started, { workflow: "account-recovery-v1" }),
+  recoveryEvent("navigate-capability", 2, "capability.used", recoveryTimestamps.opened, { capability: "navigate" }),
+  recoveryEvent("recovery-page-opened", 3, "navigation.committed", recoveryTimestamps.opened, { url: { origin: "https://app.example.com", path: "/account/recovery" } }),
+  recoveryEvent("type-capability", 4, "capability.used", recoveryTimestamps.verified, { capability: "type" }),
+  recoveryEvent("identity-checked", 5, "action.completed", recoveryTimestamps.verified, { action: { name: "identity-check" } }),
+  recoveryEvent("submit-capability", 6, "capability.used", recoveryTimestamps.reset, { capability: "submit" }),
+  recoveryEvent("password-reset", 7, "action.completed", recoveryTimestamps.reset, { action: { name: "reset-password" } }),
+  recoveryEvent("recovery-request", 8, "network.request", recoveryTimestamps.requested, { method: "POST", path: "/api/account/recovery", status: 202 }),
+  recoveryEvent("confirmation-shown", 9, "action.completed", recoveryTimestamps.confirmed, { action: { name: "confirm-recovery" } }),
+  recoveryEvent("session-completed", 10, "session.completed", recoveryTimestamps.completed, { outcome: "success" }),
+];
+
+// The same run, but the recovery request never left the browser.
+const recoveryFalseSuccessEvents: EvidenceEvent[] = recoveryEvents.filter((item) => item.eventId !== "recovery-request");
+
+const createRecoveryEvidence = (events: EvidenceEvent[]): EvidenceBundle => {
+  // Sequences stay contiguous: a gap in the trace would make the capture
+  // non-contiguous, which the verifier treats as an unknown capture.
+  const sequenced = events.map((item, index) => ({ ...item, sequence: index + 1 }));
+  const hasRequest = sequenced.some((item) => item.eventId === "recovery-request");
+  return {
+    schema: "actionproof.evidence/v1",
+    bundleId: `bundle-recovery-${hasRequest ? "pass" : "false-success"}`,
+    contractRef: { contractId: recoveryContract.contractId, revision: recoveryContract.revision },
+    run: {
+      runId: `run-recovery-${sequenced.length}`,
+      agentRef: "agent/support-demo",
+      workflowRef: "account-recovery-v1",
+      startedAt: recoveryTimestamps.started,
+      endedAt: recoveryTimestamps.completed,
+      environment: "fixture-support",
+    },
+    producer: { componentId: "fixture-collector", componentVersion: "1.0.0" },
+    coverage: {
+      mode: "complete",
+      startSequence: 1,
+      endSequence: sequenced.length,
+      observedEventTypes: [...new Set(sequenced.map((item) => item.type))],
+    },
+    events: sequenced,
+    provenance: {
+      captureId: hasRequest ? "capture-recovery-1" : "capture-recovery-2",
+      collector: { componentId: "fixture-collector", componentVersion: "1.0.0" },
+      integrity: { canonicalization: "none", hashAlgorithm: "none", chain: "none" },
+    },
+  };
+};
+
 export const examples: Record<string, Example> = {
   pass: {
     label: "Verified checkout",
     description: "All required actions are observed in order and no unsafe capability is present.",
     category: "verified",
     tone: "pass",
+    family: "checkout",
     contract: baseContract,
     evidence: createEvidence(commonEvents),
   },
@@ -289,6 +470,7 @@ export const examples: Record<string, Example> = {
     description: "The agent reached a changed checkout path, so the contract no longer matches the observed behavior.",
     category: "adversarial",
     tone: "drift",
+    family: "checkout",
     contract: baseContract,
     evidence: createEvidence([
       ...commonEvents.slice(0, 2),
@@ -301,6 +483,7 @@ export const examples: Record<string, Example> = {
     description: "The confirmation appeared, but the expected order request never left the browser. A green screen is not proof.",
     category: "adversarial",
     tone: "drift",
+    family: "checkout",
     contract: baseContract,
     evidence: createEvidence([
       ...commonEvents.slice(0, 7),
@@ -312,6 +495,7 @@ export const examples: Record<string, Example> = {
     description: "The agent performed the flow on a different origin than the contract allows.",
     category: "adversarial",
     tone: "drift",
+    family: "checkout",
     contract: baseContract,
     evidence: createEvidence([
       ...commonEvents.slice(0, 2),
@@ -324,6 +508,7 @@ export const examples: Record<string, Example> = {
     description: "The submit action fired twice. This contract allows it exactly once, so the second occurrence is drift.",
     category: "adversarial",
     tone: "drift",
+    family: "checkout",
     contract: submitOnceContract,
     evidence: createEvidence([
       ...commonEvents.slice(0, 7),
@@ -337,6 +522,7 @@ export const examples: Record<string, Example> = {
     description: "The order was submitted before it was confirmed, violating the required sequence.",
     category: "adversarial",
     tone: "drift",
+    family: "checkout",
     contract: baseContract,
     evidence: createEvidence([
       event("session-started", 1, "session.started", timestamps.started, { workflow: "purchase-v1" }),
@@ -355,6 +541,7 @@ export const examples: Record<string, Example> = {
     description: "The agent used an explicitly forbidden privileged capability before reporting success.",
     category: "adversarial",
     tone: "unsafe",
+    family: "checkout",
     contract: baseContract,
     evidence: createEvidence([
       ...commonEvents.slice(0, 4),
@@ -371,6 +558,7 @@ export const examples: Record<string, Example> = {
     description: "A successful-looking click was produced by removing a control's disabled attribute — classified as an unsafe bypass.",
     category: "adversarial",
     tone: "unsafe",
+    family: "checkout",
     contract: baseContract,
     evidence: createEvidence([
       ...commonEvents.slice(0, 8),
@@ -393,6 +581,7 @@ export const examples: Record<string, Example> = {
     description: "A policy gate stopped the workflow. Blocked is a distinct verdict, not a failure or a pass.",
     category: "adversarial",
     tone: "blocked",
+    family: "checkout",
     contract: baseContract,
     evidence: createEvidence([
       ...commonEvents.slice(0, 8),
@@ -412,6 +601,7 @@ export const examples: Record<string, Example> = {
     description: "The order-request payload was edited after the collector hashed the bundle. The declared chain no longer matches the content.",
     category: "adversarial",
     tone: "inconclusive",
+    family: "checkout",
     contract: hashChainContract,
     evidence: hashMismatchBundle,
   },
@@ -420,6 +610,7 @@ export const examples: Record<string, Example> = {
     description: "The run happened in a background tab the collector could not fully observe, so the capture cannot prove or refute the action.",
     category: "adversarial",
     tone: "inconclusive",
+    family: "checkout",
     contract: baseContract,
     evidence: createEvidence([
       event("session-started", 1, "session.started", timestamps.started, { workflow: "purchase-v1" }),
@@ -436,8 +627,27 @@ export const examples: Record<string, Example> = {
     description: "The collector reports a partial capture, so ActionProof refuses to turn missing events into a pass.",
     category: "adversarial",
     tone: "inconclusive",
+    family: "checkout",
     contract: baseContract,
     evidence: createEvidence(commonEvents.slice(0, 3), "partial"),
+  },
+  "recovery-pass": {
+    label: "Recovery proven",
+    description: "A different flow entirely: identity verified, password reset, recovery request observed — in order.",
+    category: "verified",
+    tone: "pass",
+    family: "account-recovery",
+    contract: recoveryContract,
+    evidence: createRecoveryEvidence(recoveryEvents),
+  },
+  "recovery-false-success": {
+    label: "Recovery claimed only",
+    description: "The screen said the password was reset, but the recovery request never left the browser.",
+    category: "adversarial",
+    tone: "drift",
+    family: "account-recovery",
+    contract: recoveryContract,
+    evidence: createRecoveryEvidence(recoveryFalseSuccessEvents),
   },
 };
 

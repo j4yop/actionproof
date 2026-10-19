@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { examples, getExample } from "@/domain/actionproof/examples";
 import { ContractWizard } from "@/components/contract-wizard";
 import { BundleIO } from "@/components/bundle-io";
@@ -13,6 +13,11 @@ import type { EvidenceBundle, VerificationResult } from "@/domain/actionproof/ty
 type ApiError = ApiErrorShape;
 
 const initialExample = getExample("pass");
+
+const FAMILY_LABELS: Record<string, string> = {
+  checkout: "CHECKOUT",
+  "account-recovery": "ACCOUNT RECOVERY",
+};
 
 export function ActionProofConsole() {
   const [contractText, setContractText] = useState(() => pretty(initialExample?.contract));
@@ -210,20 +215,28 @@ export function ActionProofConsole() {
             <p className="workspace-subtitle">Load a verified path or an adversarial scenario. Every scenario runs through the live verifier — nothing is trusted until you press verify.</p>
           </div>
           <div className="fixture-strip">
-            <span className="fixture-label">VERIFIED PATH</span>
-            {Object.entries(examples).filter(([, example]) => example.category === "verified").map(([name, example]) => (
-              <button key={name} className={`fixture-button ${activeExample === name ? "is-active" : ""}`} onClick={() => loadExample(name)} type="button" aria-pressed={activeExample === name} disabled={isVerifying} title={example.description}>
-                <span className={`fixture-dot fixture-${example.tone}`} />
-                {example.label}
-              </button>
-            ))}
-            <span className="fixture-label fixture-label-adversarial">ADVERSARIAL GALLERY</span>
-            {Object.entries(examples).filter(([, example]) => example.category === "adversarial").map(([name, example]) => (
-              <button key={name} className={`fixture-button ${activeExample === name ? "is-active" : ""}`} onClick={() => loadExample(name)} type="button" aria-pressed={activeExample === name} disabled={isVerifying} title={example.description}>
-                <span className={`fixture-dot fixture-${example.tone}`} />
-                {example.label}
-              </button>
-            ))}
+            {(["verified", "adversarial"] as const).map((category) => {
+              const familyEntries = Object.entries(examples).filter(([, example]) => example.category === category);
+              const families = [...new Set(familyEntries.map(([, example]) => example.family))];
+              return (
+                <Fragment key={category}>
+                  <span className="fixture-label">{category === "verified" ? "VERIFIED PATH" : "ADVERSARIAL GALLERY"}</span>
+                  {families.map((family) => (
+                    <Fragment key={family}>
+                      <span className="fixture-family">{FAMILY_LABELS[family]}</span>
+                      {familyEntries
+                        .filter(([, example]) => example.family === family)
+                        .map(([name, example]) => (
+                          <button key={name} className={`fixture-button ${activeExample === name ? "is-active" : ""}`} onClick={() => loadExample(name)} type="button" aria-pressed={activeExample === name} disabled={isVerifying} title={example.description}>
+                            <span className={`fixture-dot fixture-${example.tone}`} />
+                            {example.label}
+                          </button>
+                        ))}
+                    </Fragment>
+                  ))}
+                </Fragment>
+              );
+            })}
             {activeExample === "custom" && <span className="custom-state">CUSTOM INPUT</span>}
           </div>
         </div>

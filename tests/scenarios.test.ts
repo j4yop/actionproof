@@ -27,6 +27,8 @@ const expectedVerdicts: Record<string, { status: string; reasonCode: string }> =
   "hash-mismatch": { status: "INCONCLUSIVE", reasonCode: "EVENT_HASH_MISMATCH" },
   "hidden-tab": { status: "INCONCLUSIVE", reasonCode: "COVERAGE_INCOMPLETE" },
   inconclusive: { status: "INCONCLUSIVE", reasonCode: "COVERAGE_INCOMPLETE" },
+  "recovery-pass": { status: "PASS", reasonCode: "ASSERTION_PASSED" },
+  "recovery-false-success": { status: "DRIFT", reasonCode: "EVENT_COUNT_OUT_OF_RANGE" },
 };
 
 describe("adversarial scenario gallery", () => {
@@ -35,6 +37,29 @@ describe("adversarial scenario gallery", () => {
     const adversarial = Object.values(examples).filter((example) => example.category === "adversarial");
     expect(adversarial.length).toBeGreaterThanOrEqual(8);
     expect(adversarial.every((example) => ["drift", "unsafe", "blocked", "inconclusive"].includes(example.tone))).toBe(true);
+  });
+
+  it("covers more than one scenario family, so the verifier is not tuned to one flow", () => {
+    const families = new Set(Object.values(examples).map((example) => example.family));
+
+    expect(families.size).toBeGreaterThanOrEqual(2);
+    expect(families.has("checkout")).toBe(true);
+    expect(families.has("account-recovery")).toBe(true);
+    expect(examples["recovery-pass"].contract.contractId).toBe("account.recovery");
+    expect(examples["recovery-pass"].contract.contractId).not.toBe(examples.pass.contract.contractId);
+  });
+
+  it("keeps the account-recovery family honest: the request is the difference", () => {
+    const pass = examples["recovery-pass"];
+    const falseSuccess = examples["recovery-false-success"];
+
+    expect(pass.contract).toEqual(falseSuccess.contract);
+    const passEvents = pass.evidence.events.map((event) => event.eventId);
+    const falseEvents = falseSuccess.evidence.events.map((event) => event.eventId);
+
+    expect(passEvents).toContain("recovery-request");
+    expect(falseEvents).not.toContain("recovery-request");
+    expect(passEvents.length - falseEvents.length).toBe(1);
   });
 
   it("produces schema-valid contracts and evidence for every scenario", () => {
