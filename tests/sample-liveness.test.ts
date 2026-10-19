@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { POST } from "@/app/api/verify/route";
+import { getExample } from "@/domain/actionproof/examples";
 import { verify } from "@/domain/actionproof/verify";
 import type { Contract, EvidenceBundle, VerificationContext, VerificationResult } from "@/domain/actionproof/types";
 
@@ -189,5 +190,18 @@ describe("verdicts are computed live from the payload", () => {
     const passBody = (await passResponse.json()) as { result: VerificationResult };
 
     expect(passBody.result.status).toBe("PASS");
+  });
+
+  it("keeps the shipped sample files identical to the in-app gallery presets", () => {
+    const galleryPass = getExample("recovery-pass");
+    const galleryFalseSuccess = getExample("recovery-false-success");
+
+    expect(galleryPass).toBeDefined();
+    expect(galleryFalseSuccess).toBeDefined();
+
+    // The sample files and the gallery presets must not drift apart.
+    expect(JSON.parse(JSON.stringify(galleryPass!.contract))).toEqual(contract);
+    expect(JSON.parse(JSON.stringify(galleryPass!.evidence))).toEqual(evidencePass);
+    expect(JSON.parse(JSON.stringify(galleryFalseSuccess!.evidence))).toEqual(evidenceFalseSuccess);
   });
 });

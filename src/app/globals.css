@@ -3175,3 +3175,13 @@ select:focus-visible {
   color: var(--muted);
   cursor: default;
 }
+
+.fixture-family {
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  color: var(--subtle);
+  opacity: 0.8;
+  margin-left: 6px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line-soft);
+}
