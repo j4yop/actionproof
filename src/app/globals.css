@@ -3062,3 +3062,44 @@ summary:focus-visible {
   font-size: 0.78rem;
   max-width: 72ch;
 }
+
+/* --- Import/export bundle --- */
+
+.bundle-io { display: grid; gap: 12px; }
+
+.bundle-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.bundle-import { position: relative; cursor: pointer; }
+.bundle-import:hover { border-color: var(--cyan-strong); }
+
+.bundle-file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.bundle-message {
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.82rem;
+}
+
+.bundle-message p { margin: 0; }
+.bundle-message.is-error { border-color: var(--red); color: var(--red); }
+.bundle-message.is-success { border-color: var(--green); color: var(--green); }
+
+.bundle-note {
+  margin: 0;
+  color: var(--subtle);
+  font-size: 0.78rem;
+  max-width: 74ch;
+}

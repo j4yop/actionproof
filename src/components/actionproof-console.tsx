@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { examples, getExample } from "@/domain/actionproof/examples";
 import { ContractWizard } from "@/components/contract-wizard";
+import { BundleIO } from "@/components/bundle-io";
 import { EvidenceExplorer } from "@/components/evidence-explorer";
 import { JudgeMode } from "@/components/judge-mode";
 import { ReceiptActions } from "@/components/receipt-actions";
@@ -275,6 +276,19 @@ export function ActionProofConsole() {
               </button>
               <span className="input-footnote">POST /api/verify · {formatBytes(inputStats.evidenceBytes)} evidence payload · {activeExample === "custom" ? "custom input" : "fixture input"}</span>
             </div>
+            <BundleIO
+              result={result}
+              contractText={contractText}
+              evidenceText={evidenceText}
+              onImport={(contractJson, evidenceJson) => {
+                setContractText(contractJson);
+                setEvidenceText(evidenceJson);
+                setActiveExample("custom");
+                setResult(null);
+                setVerifiedInput(null);
+                setError(null);
+              }}
+            />
           </section>
 
           <ResultPanel result={result} error={error} isVerifying={isVerifying} resultRef={resultRef} stale={resultIsStale} contractText={contractText} evidenceText={evidenceText} />
