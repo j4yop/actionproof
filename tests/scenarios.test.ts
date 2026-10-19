@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { examples } from "@/domain/actionproof/examples";
+import { examples, getExample, scenarioGroups } from "@/domain/actionproof/examples";
 import { contractSchema, evidenceSchema } from "@/domain/actionproof/schemas";
 import { verify } from "@/domain/actionproof/verify";
 import type { VerificationContext } from "@/domain/actionproof/types";
@@ -66,6 +66,25 @@ describe("adversarial scenario gallery", () => {
     for (const [name, example] of Object.entries(examples)) {
       expect(contractSchema.safeParse(example.contract).success, `contract schema for ${name}`).toBe(true);
       expect(evidenceSchema.safeParse(example.evidence).success, `evidence schema for ${name}`).toBe(true);
+    }
+  });
+
+  it("groups every scenario by family for the gallery strip and the narrow-screen picker", () => {
+    const groups = scenarioGroups();
+    const options = groups.flatMap((group) => group.options);
+
+    expect(groups.length).toBeGreaterThanOrEqual(2);
+    expect(options.length).toBe(Object.keys(examples).length);
+    expect(new Set(options.map((option) => option.value)).size).toBe(options.length);
+    expect(options.every((option) => getExample(option.value) !== undefined)).toBe(true);
+
+    // The verified path of each family comes before its adversarial scenarios.
+    for (const group of groups) {
+      const categories = group.options.map((option) => option.category);
+      const firstAdversarial = categories.indexOf("adversarial");
+      if (firstAdversarial >= 0) {
+        expect(categories.slice(firstAdversarial).every((category) => category === "adversarial")).toBe(true);
+      }
     }
   });
 

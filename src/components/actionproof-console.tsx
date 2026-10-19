@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { examples, getExample } from "@/domain/actionproof/examples";
+import { examples, FAMILY_LABELS, getExample, scenarioGroups } from "@/domain/actionproof/examples";
 import { ContractWizard } from "@/components/contract-wizard";
 import { BundleIO } from "@/components/bundle-io";
 import { EvidenceExplorer } from "@/components/evidence-explorer";
@@ -13,11 +13,6 @@ import type { EvidenceBundle, VerificationResult } from "@/domain/actionproof/ty
 type ApiError = ApiErrorShape;
 
 const initialExample = getExample("pass");
-
-const FAMILY_LABELS: Record<string, string> = {
-  checkout: "CHECKOUT",
-  "account-recovery": "ACCOUNT RECOVERY",
-};
 
 export function ActionProofConsole() {
   const [contractText, setContractText] = useState(() => pretty(initialExample?.contract));
@@ -214,6 +209,9 @@ export function ActionProofConsole() {
             <h2>Bring your evidence.</h2>
             <p className="workspace-subtitle">Load a verified path or an adversarial scenario. Every scenario runs through the live verifier — nothing is trusted until you press verify.</p>
           </div>
+        </div>
+
+        <div className="gallery-band">
           <div className="fixture-strip">
             {(["verified", "adversarial"] as const).map((category) => {
               const familyEntries = Object.entries(examples).filter(([, example]) => example.category === category);
@@ -222,8 +220,8 @@ export function ActionProofConsole() {
                 <Fragment key={category}>
                   <span className="fixture-label">{category === "verified" ? "VERIFIED PATH" : "ADVERSARIAL GALLERY"}</span>
                   {families.map((family) => (
-                    <Fragment key={family}>
-                      <span className="fixture-family">{FAMILY_LABELS[family]}</span>
+                    <span className="fixture-group" key={family}>
+                      <span className="fixture-family">{FAMILY_LABELS[family].toUpperCase()}</span>
                       {familyEntries
                         .filter(([, example]) => example.family === family)
                         .map(([name, example]) => (
@@ -232,12 +230,40 @@ export function ActionProofConsole() {
                             {example.label}
                           </button>
                         ))}
-                    </Fragment>
+                    </span>
                   ))}
                 </Fragment>
               );
             })}
             {activeExample === "custom" && <span className="custom-state">CUSTOM INPUT</span>}
+          </div>
+
+          <div className="scenario-picker">
+            <label htmlFor="scenario-picker">
+              <span className="scenario-picker-label">SCENARIO</span>
+              <select
+                id="scenario-picker"
+                value={activeExample}
+                disabled={isVerifying}
+                onChange={(event) => {
+                  const name = event.target.value;
+                  if (!getExample(name)) return;
+                  loadExample(name);
+                  const example = getExample(name);
+                  setAnnouncement(buildAnnouncement({ kind: "loaded", label: example?.label ?? name }));
+                }}
+              >
+                {activeExample === "custom" && <option value="custom">Custom input</option>}
+                {scenarioGroups().map((group) => (
+                  <optgroup key={group.family} label={group.label}>
+                    {group.options.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+            <p className="scenario-picker-note">Loads a contract and evidence into the editors. Nothing is verified until you press verify.</p>
           </div>
         </div>
 

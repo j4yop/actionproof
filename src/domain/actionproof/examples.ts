@@ -655,6 +655,55 @@ export function getExample(name: string): Example | undefined {
   return examples[name];
 }
 
+export const FAMILY_LABELS: Record<ExampleFamily, string> = {
+  checkout: "Checkout flow",
+  "account-recovery": "Account recovery",
+};
+
+export interface ScenarioOption {
+  value: string;
+  label: string;
+  description: string;
+  category: ExampleCategory;
+  tone: ExampleTone;
+  family: ExampleFamily;
+}
+
+export interface ScenarioGroup {
+  family: ExampleFamily;
+  label: string;
+  options: ScenarioOption[];
+}
+
+/**
+ * The gallery, grouped by scenario family. The desktop strip renders one
+ * button per option; narrow screens render the same options in a select.
+ */
+export function scenarioGroups(): ScenarioGroup[] {
+  const groups = new Map<ExampleFamily, ScenarioOption[]>();
+  for (const [value, example] of Object.entries(examples)) {
+    const options = groups.get(example.family) ?? [];
+    options.push({
+      value,
+      label: example.label,
+      description: example.description,
+      category: example.category,
+      tone: example.tone,
+      family: example.family,
+    });
+    groups.set(example.family, options);
+  }
+
+  return [...groups.entries()].map(([family, options]) => ({
+    family,
+    label: FAMILY_LABELS[family],
+    options: options.sort((left, right) => {
+      if (left.category !== right.category) return left.category === "verified" ? -1 : 1;
+      return left.label.localeCompare(right.label);
+    }),
+  }));
+}
+
 export function examplesByCategory(category: ExampleCategory): Example[] {
   return Object.entries(examples).filter(([, example]) => example.category === category).map(([, example]) => example);
 }
