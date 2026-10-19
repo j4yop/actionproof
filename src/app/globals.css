@@ -3029,3 +3029,36 @@ summary:focus-visible {
 @media (max-width: 1050px) {
   .explorer-body { grid-template-columns: 1fr; }
 }
+
+/* --- Portable receipt --- */
+
+.receipt-actions { display: grid; gap: 12px; }
+
+.receipt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.receipt-button {
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--ink);
+  padding: 12px 14px;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.receipt-button:hover:not(:disabled) { border-color: var(--cyan-strong); }
+.receipt-button strong { font-size: 0.86rem; }
+.receipt-button small { color: var(--subtle); font-size: 0.74rem; }
+.receipt-button code { font-size: 0.7rem; color: var(--muted); overflow-wrap: anywhere; }
+
+.receipt-note {
+  margin: 0;
+  color: var(--subtle);
+  font-size: 0.78rem;
+  max-width: 72ch;
+}
