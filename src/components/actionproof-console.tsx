@@ -167,7 +167,7 @@ export function ActionProofConsole() {
           <p>Contracts express expectations. Evidence records observations. The verifier makes the conclusion.</p>
         </div>
         <div className="footer-right">
-          <span>ActionProof verifier 1.0.0</span>
+          <span>ActionProof verifier 1.1.0</span>
           <span>Built for explainable automation</span>
         </div>
       </footer>

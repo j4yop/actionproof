@@ -7,7 +7,7 @@ ActionProof is a live, deterministic verifier for browser-agent evidence. A user
 1. A **contract** describing the behavior that should be allowed and observed.
 2. An **evidence bundle** describing what the agent, browser, policy gate, and collector actually observed.
 
-ActionProof returns an explainable verdict and links every assertion result back to the event IDs that support it.
+ActionProof returns an explainable verdict and links every assertion result back to the event IDs that support it. The current verifier profile is `actionproof-web-v1.1`.
 
 ## The problem
 
