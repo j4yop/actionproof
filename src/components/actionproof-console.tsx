@@ -235,7 +235,7 @@ function ResultPanel({ result, error, isVerifying }: { result: VerificationResul
       <div className="summary-grid" aria-label="Assertion summary">
         <SummaryCell value={result.summary.passed} label="passed" tone="pass" />
         <SummaryCell value={result.summary.failed} label="drift" tone="drift" />
-        <SummaryCell value={result.summary.unsafe} label="unsafe" tone="unsafe" />
+        <SummaryCell value={result.summary.unsafeEvents} label="unsafe events" tone="unsafe" />
         <SummaryCell value={result.summary.inconclusive} label="unknown" tone="unknown" />
       </div>
 
@@ -255,6 +255,8 @@ function ResultPanel({ result, error, isVerifying }: { result: VerificationResul
       <div className="result-section result-details">
         <div className="detail-row"><span>Coverage</span><strong>{result.coverage.mode.toUpperCase()}</strong></div>
         <div className="detail-row"><span>Provenance</span><strong>{result.evidence.provenance.toUpperCase()}</strong></div>
+        <div className="detail-row"><span>Chain</span><strong>{result.evidence.integrity.chain.toUpperCase()}</strong></div>
+        <div className="detail-row"><span>Bundle hash</span><strong>{result.evidence.integrity.bundle.toUpperCase()}</strong></div>
         <div className="detail-row"><span>Contract</span><code>{result.contract.hash.slice(0, 14)}…</code></div>
         <div className="detail-row"><span>Evidence</span><code>{result.evidence.hash.slice(0, 14)}…</code></div>
       </div>

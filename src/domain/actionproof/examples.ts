@@ -125,6 +125,7 @@ const createEvidence = (events: EvidenceEvent[], mode: EvidenceBundle["coverage"
   run: {
     runId: `run-${events.length}`,
     agentRef: "agent/demo",
+    workflowRef: "purchase-v1",
     startedAt: timestamps.started,
     endedAt: timestamps.completed,
     environment: "fixture-store",
@@ -132,6 +133,8 @@ const createEvidence = (events: EvidenceEvent[], mode: EvidenceBundle["coverage"
   producer: { componentId: "fixture-collector", componentVersion: "1.0.0" },
   coverage: {
     mode,
+    startSequence: mode === "complete" ? Math.min(...events.map((item) => item.sequence)) : undefined,
+    endSequence: mode === "complete" ? Math.max(...events.map((item) => item.sequence)) : undefined,
     observedEventTypes: [...new Set(events.map((item) => item.type))],
   },
   events,
@@ -144,11 +147,14 @@ const createEvidence = (events: EvidenceEvent[], mode: EvidenceBundle["coverage"
 
 const commonEvents = [
   event("session-started", 1, "session.started", timestamps.started, { workflow: "purchase-v1" }),
-  event("checkout-opened", 2, "navigation.committed", timestamps.checkout, { url: { origin: "https://shop.example", path: "/checkout" } }),
-  event("confirmation", 3, "action.completed", timestamps.confirm, { action: { name: "confirm-order" } }),
-  event("submit", 4, "action.completed", timestamps.submit, { action: { name: "submit-order" } }),
-  event("order-request", 5, "network.request", timestamps.submit, { method: "POST", path: "/api/orders", status: 201 }),
-  event("session-completed", 6, "session.completed", timestamps.completed, { outcome: "success" }),
+  event("navigate-capability", 2, "capability.used", timestamps.checkout, { capability: "navigate" }),
+  event("checkout-opened", 3, "navigation.committed", timestamps.checkout, { url: { origin: "https://shop.example", path: "/checkout" } }),
+  event("click-capability", 4, "capability.used", timestamps.confirm, { capability: "click" }),
+  event("confirmation", 5, "action.completed", timestamps.confirm, { action: { name: "confirm-order" } }),
+  event("submit-capability", 6, "capability.used", timestamps.submit, { capability: "submit" }),
+  event("submit", 7, "action.completed", timestamps.submit, { action: { name: "submit-order" } }),
+  event("order-request", 8, "network.request", timestamps.submit, { method: "POST", path: "/api/orders", status: 201 }),
+  event("session-completed", 9, "session.completed", timestamps.completed, { outcome: "success" }),
 ];
 
 export const examples: Record<string, Example> = {
@@ -163,9 +169,9 @@ export const examples: Record<string, Example> = {
     description: "The agent reached a changed checkout path, so the contract no longer matches the observed behavior.",
     contract: baseContract,
     evidence: createEvidence([
-      commonEvents[0],
-      event("checkout-drift", 2, "navigation.committed", timestamps.checkout, { url: { origin: "https://shop.example", path: "/cart" } }),
-      ...commonEvents.slice(2),
+      ...commonEvents.slice(0, 2),
+      event("checkout-drift", 3, "navigation.committed", timestamps.checkout, { url: { origin: "https://shop.example", path: "/cart" } }),
+      ...commonEvents.slice(3),
     ]),
   },
   unsafe: {
@@ -174,9 +180,12 @@ export const examples: Record<string, Example> = {
     contract: baseContract,
     evidence: createEvidence([
       ...commonEvents.slice(0, 4),
-      event("bypass", 5, "capability.used", timestamps.submit, { capability: "unsafe-evaluate", target: "#place-order" }, { kind: "browser-agent", ref: "agent/demo" }),
-      event("order-request", 6, "network.request", timestamps.submit, { method: "POST", path: "/api/orders", status: 201 }),
-      event("session-completed", 7, "session.completed", timestamps.completed, { outcome: "success" }),
+      event("confirmation", 5, "action.completed", timestamps.confirm, { action: { name: "confirm-order" } }),
+      event("submit-capability", 6, "capability.used", timestamps.submit, { capability: "submit" }),
+      event("submit", 7, "action.completed", timestamps.submit, { action: { name: "submit-order" } }),
+      event("bypass", 8, "capability.used", timestamps.submit, { capability: "unsafe-evaluate", target: "#place-order" }, { kind: "browser-agent", ref: "agent/demo" }),
+      event("order-request", 9, "network.request", timestamps.submit, { method: "POST", path: "/api/orders", status: 201 }),
+      event("session-completed", 10, "session.completed", timestamps.completed, { outcome: "success" }),
     ]),
   },
   inconclusive: {

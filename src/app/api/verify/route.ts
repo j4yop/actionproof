@@ -7,11 +7,24 @@ import { VerificationInputError, verify } from "@/domain/actionproof/verify";
 const MAX_BODY_BYTES = 512_000;
 const VERIFIER_VERSION = "1.0.0";
 const PROFILE_ID = "actionproof-web-v1";
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 60;
+const requestBuckets = new Map<string, { startedAt: number; count: number }>();
 
 export async function POST(request: Request) {
-  const rawBody = await request.text();
-  if (new TextEncoder().encode(rawBody).byteLength > MAX_BODY_BYTES) {
-    return NextResponse.json({ error: { code: "BODY_TOO_LARGE", message: "Use a JSON payload smaller than 512 KB." } }, { status: 413 });
+  const rateLimit = checkRateLimit(request);
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: { code: "RATE_LIMITED", message: "Too many verification requests. Try again shortly." } }, { status: 429, headers: { "retry-after": String(rateLimit.retryAfterSeconds) } });
+  }
+
+  let rawBody: string;
+  try {
+    rawBody = await readBodyWithinLimit(request, MAX_BODY_BYTES);
+  } catch (error) {
+    if (error instanceof BodyTooLargeError) {
+      return NextResponse.json({ error: { code: "BODY_TOO_LARGE", message: "Use a JSON payload smaller than 512 KB." } }, { status: 413 });
+    }
+    return NextResponse.json({ error: { code: "REQUEST_BODY_UNREADABLE", message: "The request body could not be read." } }, { status: 400 });
   }
 
   let payload: unknown;
@@ -63,6 +76,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ result }, { status: 200 });
   } catch (error) {
     if (error instanceof VerificationInputError) {
+      const status = error.issues.some((issue) => issue.code === "RESOURCE_LIMIT_EXCEEDED") ? 413 : 422;
       return NextResponse.json(
         {
           error: {
@@ -71,7 +85,7 @@ export async function POST(request: Request) {
             issues: error.issues,
           },
         },
-        { status: 422 },
+        { status },
       );
     }
 
@@ -82,4 +96,59 @@ export async function POST(request: Request) {
 
 function sha256(value: unknown): string {
   return createHash("sha256").update(stableStringify(value)).digest("hex");
+}
+
+class BodyTooLargeError extends Error {}
+
+async function readBodyWithinLimit(request: Request, limit: number): Promise<string> {
+  if (!request.body) {
+    const body = await request.text();
+    if (new TextEncoder().encode(body).byteLength > limit) throw new BodyTooLargeError();
+    return body;
+  }
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > limit) {
+        await reader.cancel();
+        throw new BodyTooLargeError();
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(body);
+}
+
+function checkRateLimit(request: Request): { allowed: boolean; retryAfterSeconds: number } {
+  const now = Date.now();
+  const identity = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "anonymous";
+  const current = requestBuckets.get(identity);
+
+  if (!current || now - current.startedAt >= RATE_LIMIT_WINDOW_MS) {
+    requestBuckets.set(identity, { startedAt: now, count: 1 });
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+
+  if (current.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil((RATE_LIMIT_WINDOW_MS - (now - current.startedAt)) / 1000)) };
+  }
+
+  current.count += 1;
+  return { allowed: true, retryAfterSeconds: 0 };
 }

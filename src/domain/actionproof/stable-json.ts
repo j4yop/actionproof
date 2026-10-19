@@ -1,20 +1,11 @@
+import canonicalize from "canonicalize";
+
 export function stableStringify(value: unknown): string {
-  return JSON.stringify(sortValue(value));
-}
-
-function sortValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortValue);
-
-  if (value && typeof value === "object") {
-    return Object.keys(value as Record<string, unknown>)
-      .sort()
-      .reduce<Record<string, unknown>>((result, key) => {
-        result[key] = sortValue((value as Record<string, unknown>)[key]);
-        return result;
-      }, {});
+  const result = canonicalize(value);
+  if (result === undefined) {
+    throw new TypeError("Only JSON-compatible values can be canonicalized.");
   }
-
-  return value;
+  return result;
 }
 
 export function valuesEqual(left: unknown, right: unknown): boolean {

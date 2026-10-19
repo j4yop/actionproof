@@ -77,6 +77,18 @@ Signed contracts are therefore fail-closed as `INCONCLUSIVE` until a trusted-key
 
 The result makes this distinction visible instead of collapsing it into a security badge.
 
+## Admissibility before verdict
+
+The verifier does not evaluate a positive assertion in isolation and then assume the surrounding evidence is trustworthy. Its order is:
+
+```text
+schema → resource budget → cross-document validation → integrity
+→ coverage → temporal/identity binding → scope → block classification
+→ assertion evaluation → final status
+```
+
+This prevents a complete-looking fixture from receiving `PASS` when its run window, coverage declaration, scope evidence, identity, or required integrity profile cannot be established.
+
 ## Deployment
 
 The Next.js route runs as a Vercel function. The deployment requires no environment variables. Vercel Deployment Protection must remain disabled for the public judge URL, otherwise unauthenticated judges will see an access wall instead of the console.

@@ -101,6 +101,11 @@ export interface EvidenceEvent {
     capturedAt: string;
     parentEventId?: string;
   };
+  classification?: {
+    kind: "observation" | "action-block" | "policy-block" | "unsafe-bypass";
+    reason?: string;
+    affectsAssertionIds?: string[];
+  };
   integrity?: {
     eventHash: string;
     previousEventHash?: string;
@@ -117,6 +122,7 @@ export interface EvidenceBundle {
   run: {
     runId: string;
     agentRef?: string;
+    workflowRef?: string;
     startedAt: string;
     endedAt?: string;
     environment?: string;
@@ -206,6 +212,11 @@ export interface VerificationResult {
     bundleId: string;
     hash: string;
     provenance: "verified" | "tamper-evident" | "unverified";
+    integrity: {
+      bundle: "not-required" | "verified" | "missing" | "mismatch" | "unsupported";
+      chain: "not-required" | "verified" | "missing" | "mismatch" | "unsupported";
+      signature: "not-required" | "verified" | "missing" | "invalid" | "unverifiable";
+    };
   };
   verifier: {
     name: "actionproof-verifier";
@@ -218,6 +229,7 @@ export interface VerificationResult {
     failed: number;
     blocked: number;
     unsafe: number;
+    unsafeEvents: number;
     inconclusive: number;
   };
   assertionResults: AssertionResult[];

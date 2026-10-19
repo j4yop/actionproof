@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const metadataSchema = z.record(z.string(), z.string()).refine((value) => Object.keys(value).length <= 256, "Metadata cannot contain more than 256 entries.");
+
 const predicateSchema = z.union([
   z
     .object({
@@ -27,7 +29,7 @@ const predicateSchema = z.union([
 const selectorSchema = z
   .object({
     type: z.string().min(1),
-    where: z.array(predicateSchema).optional(),
+    where: z.array(predicateSchema).max(32).optional(),
   })
   .strict();
 
@@ -114,7 +116,7 @@ export const contractSchema = z
         integrity: z.enum(["none", "hash-chain", "signed"]),
       })
       .strict(),
-    metadata: z.record(z.string(), z.string()).optional(),
+    metadata: metadataSchema.optional(),
   })
   .strict();
 
@@ -140,10 +142,18 @@ const evidenceEventSchema = z
         parentEventId: z.string().max(160).optional(),
       })
       .strict(),
+    classification: z
+      .object({
+        kind: z.enum(["observation", "action-block", "policy-block", "unsafe-bypass"]),
+        reason: z.string().max(500).optional(),
+        affectsAssertionIds: z.array(z.string().min(1).max(120)).max(100).optional(),
+      })
+      .strict()
+      .optional(),
     integrity: z
       .object({
-        eventHash: z.string().min(1),
-        previousEventHash: z.string().min(1).optional(),
+        eventHash: z.string().regex(/^[a-f0-9]{64}$/),
+        previousEventHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
       })
       .strict()
       .optional(),
@@ -159,7 +169,7 @@ const artifactSchema = z
     sha256: z.string().regex(/^[a-f0-9]{64}$/i),
     storageRef: z.string().min(1).max(500),
     producedAt: z.string().datetime({ offset: true }),
-    relatedEventIds: z.array(z.string().min(1)),
+    relatedEventIds: z.array(z.string().min(1)).max(10_000),
   })
   .strict();
 
@@ -177,6 +187,7 @@ export const evidenceSchema = z
       .object({
         runId: z.string().min(1).max(160),
         agentRef: z.string().max(160).optional(),
+        workflowRef: z.string().max(160).optional(),
         startedAt: z.string().datetime({ offset: true }),
         endedAt: z.string().datetime({ offset: true }).optional(),
         environment: z.string().max(160).optional(),
@@ -193,7 +204,7 @@ export const evidenceSchema = z
         mode: z.enum(["complete", "partial", "unknown"]),
         startSequence: z.number().int().nonnegative().optional(),
         endSequence: z.number().int().nonnegative().optional(),
-        observedEventTypes: z.array(z.string().min(1)),
+        observedEventTypes: z.array(z.string().min(1)).max(256),
         gaps: z
           .array(
             z
@@ -236,7 +247,7 @@ export const evidenceSchema = z
           .object({
             canonicalization: z.enum(["none", "jcs"]),
             hashAlgorithm: z.enum(["none", "sha-256"]),
-            bundleHash: z.string().min(1).optional(),
+             bundleHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
             chain: z.enum(["none", "event-hash-chain"]),
           })
           .strict(),
@@ -251,7 +262,7 @@ export const evidenceSchema = z
           .optional(),
       })
       .strict(),
-    metadata: z.record(z.string(), z.string()).optional(),
+    metadata: metadataSchema.optional(),
   })
   .strict();
 

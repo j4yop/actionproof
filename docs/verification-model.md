@@ -73,3 +73,29 @@ The verifier does not:
 - call an LLM;
 - fetch screenshots or artifact URLs;
 - infer success from the absence of a failure.
+
+## Integrity profiles
+
+`integrity: "none"` is supported for ordinary, unverified evidence. The result explicitly reports `unverified` provenance.
+
+`integrity: "hash-chain"` is strict. The bundle must declare JCS canonicalization and SHA-256, every event must contain a valid hash, every predecessor link must match the preceding event, and the bundle hash must match the canonical bundle projection. A declaration without matching cryptographic material produces `INCONCLUSIVE`; metadata presence alone never earns `tamper-evident`.
+
+`integrity: "signed"` remains fail-closed until a deployment supplies a trusted-key resolver. A signature field without trusted-key verification is `unverifiable`, not `verified`.
+
+## Evidence admissibility
+
+Before a decisive result, ActionProof checks the evidence boundary:
+
+- complete coverage has explicit sequence bounds and a contiguous event range;
+- declared event types match the actual trace;
+- a complete run has a valid end timestamp;
+- event timestamps fall inside the run window;
+- contract validity windows and declared agent/workflow/environment identity match;
+- declared origin and capability scopes have corresponding evidence;
+- blocked results come from typed or legacy gate events, not arbitrary `payload.outcome` values.
+
+Scope, identity, timing, coverage, and integrity failures are represented as `INCONCLUSIVE` when the document is structurally valid but cannot establish the claim.
+
+## Resource limits
+
+The public route caps request bodies at 512 KiB. The schemas and domain layer also bound event count, assertion count, selector predicates, metadata, artifact references, JSON Pointer depth, and payload depth. Resource-limit failures are rejected before a verdict is returned.

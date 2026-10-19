@@ -66,6 +66,8 @@ Invalid JSON and invalid schemas are API errors, not verification results.
 
 The fixture buttons are only input presets. They do not contain or display precomputed verdicts. Every fixture is sent through the same API and verifier path as custom judge input.
 
+For stricter workflows, contracts can require hash-chain integrity. In that mode ActionProof validates canonical event hashes, predecessor links, and the bundle hash before it can return `PASS`. Signed evidence remains `INCONCLUSIVE` until a trusted-key resolver is configured; a self-declared signature is never treated as verified.
+
 ## Architecture
 
 ```text
@@ -165,6 +167,8 @@ It verifies structured evidence according to explicit contracts and reports when
 ## Design principles
 
 - Missing evidence never silently becomes `PASS`.
+- Declared integrity is not accepted without matching cryptographic material.
+- Declared scope, identity, coverage, and timing must be evidenced before a decisive result.
 - A confirmed unsafe path takes precedence over a successful-looking outcome.
 - Event sequence, not clock skew, establishes ordering.
 - User-provided expectations are data, not code.
