@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type RefObject } from "react";
 import { examples, getExample } from "@/domain/actionproof/examples";
-import type { VerificationResult } from "@/domain/actionproof/types";
+import type { EvidenceBundle, VerificationResult } from "@/domain/actionproof/types";
 
 type ApiError = {
   code: string;
   message: string;
   issues?: Array<{ path?: Array<string | number>; message: string }>;
+  field?: "contract" | "evidence";
 };
 
 const initialExample = getExample("pass");
@@ -19,6 +20,11 @@ export function ActionProofConsole() {
   const [error, setError] = useState<ApiError | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [activeExample, setActiveExample] = useState("pass");
+  const [verifiedInput, setVerifiedInput] = useState<{ contract: string; evidence: string } | null>(null);
+  const workbenchRef = useRef<HTMLElement>(null);
+  const resultRef = useRef<HTMLElement>(null);
+
+  const resultIsStale = Boolean(result && verifiedInput && (verifiedInput.contract !== contractText || verifiedInput.evidence !== evidenceText));
 
   const inputStats = useMemo(
     () => ({
@@ -31,20 +37,33 @@ export function ActionProofConsole() {
 
   async function verifyInput() {
     setError(null);
-    setResult(null);
     setIsVerifying(true);
 
     let contract: unknown;
     let evidence: unknown;
+    let contractError: ApiError | null = null;
+    let evidenceError: ApiError | null = null;
     try {
       contract = JSON.parse(contractText);
+    } catch {
+      contractError = { code: "INVALID_JSON", message: "The contract editor contains invalid JSON.", field: "contract" };
+    }
+    try {
       evidence = JSON.parse(evidenceText);
     } catch {
-      setError({ code: "INVALID_JSON", message: "Both editors must contain valid JSON before verification can run." });
+      evidenceError = { code: "INVALID_JSON", message: "The evidence editor contains invalid JSON.", field: "evidence" };
+    }
+    if (contractError || evidenceError) {
+      setError(contractError ?? evidenceError);
+      requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
       setIsVerifying(false);
       return;
     }
 
+    await submitVerification(contract, evidence, { contract: contractText, evidence: evidenceText });
+  }
+
+  async function submitVerification(contract: unknown, evidence: unknown, inputSnapshot: { contract: string; evidence: string }) {
     try {
       const response = await fetch("/api/verify", {
         method: "POST",
@@ -53,12 +72,18 @@ export function ActionProofConsole() {
       });
       const body = (await response.json()) as { result?: VerificationResult; error?: ApiError };
       if (!response.ok || !body.result) {
-        setError(body.error ?? { code: "UNKNOWN_ERROR", message: "The verifier did not return a result." });
+        const apiError = body.error ?? { code: "UNKNOWN_ERROR", message: "The verifier did not return a result." };
+        const field = apiError.issues?.[0]?.path?.[0];
+        setError({ ...apiError, field: field === "contract" || field === "evidence" ? field : undefined });
+        requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
         return;
       }
       setResult(body.result);
+      setVerifiedInput(inputSnapshot);
+      requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     } catch {
       setError({ code: "NETWORK_ERROR", message: "The verification request could not reach the live API." });
+      requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     } finally {
       setIsVerifying(false);
     }
@@ -71,7 +96,32 @@ export function ActionProofConsole() {
     setContractText(pretty(example.contract));
     setEvidenceText(pretty(example.evidence));
     setResult(null);
+    setVerifiedInput(null);
     setError(null);
+  }
+
+  function runExample(name: string) {
+    const example = getExample(name);
+    if (!example || isVerifying) return;
+    const nextContract = pretty(example.contract);
+    const nextEvidence = pretty(example.evidence);
+    setActiveExample(name);
+    setContractText(nextContract);
+    setEvidenceText(nextEvidence);
+    setError(null);
+    setIsVerifying(true);
+    void submitVerification(example.contract, example.evidence, { contract: nextContract, evidence: nextEvidence });
+  }
+
+  function updateEditor(kind: "contract" | "evidence", value: string) {
+    setActiveExample("custom");
+    if (kind === "contract") setContractText(value);
+    else setEvidenceText(value);
+    if (result) setError({ code: "INPUT_CHANGED", message: "Inputs changed after the last verification. Run verification again before treating the result as current." });
+  }
+
+  function scrollToWorkbench() {
+    workbenchRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   return (
@@ -102,33 +152,42 @@ export function ActionProofConsole() {
 
       <section className="intro" id="top">
         <div className="intro-copy">
-          <p className="eyebrow">BROWSER-AGENT TRUST BOUNDARY / V1</p>
+          <p className="eyebrow">BROWSER-AGENT TRUST BOUNDARY / V1.1</p>
           <h1>Prove the action.<br /><em>Not the claim.</em></h1>
           <p className="lede">
-            ActionProof checks a workflow contract against structured run evidence. It refuses to turn missing proof, UI drift, or an unsafe bypass into a green light.
+            A deterministic evidence check for browser-agent runs. Submit the expectation, submit the trace, and see exactly what the trace can prove.
           </p>
+          <div className="intro-actions">
+            <button className="primary-button intro-button" onClick={() => { runExample("pass"); scrollToWorkbench(); }} type="button" disabled={isVerifying}>
+              <span>Run verified fixture</span>
+              <span className="button-arrow" aria-hidden="true"><ArrowUpRight /></span>
+            </button>
+            <button className="text-button" onClick={scrollToWorkbench} type="button">Open workbench <span>↓</span></button>
+          </div>
         </div>
         <div className="intro-notes" aria-label="What ActionProof answers">
-          <div className="note-line"><span>01</span><p>Did the intended action happen?</p></div>
-          <div className="note-line"><span>02</span><p>Did the observed state match?</p></div>
-          <div className="note-line"><span>03</span><p>Is the evidence complete enough?</p></div>
+          <div className="note-line"><span>01</span><p>Contract</p><small>What should happen</small></div>
+          <div className="note-line"><span>02</span><p>Evidence</p><small>What was observed</small></div>
+          <div className="note-line"><span>03</span><p>Verdict</p><small>What the trace proves</small></div>
         </div>
       </section>
 
-      <section className="workspace" aria-label="ActionProof verification workspace">
+      <section className="workspace" aria-label="ActionProof verification workspace" ref={workbenchRef}>
         <div className="workspace-heading">
           <div>
             <p className="eyebrow">VERIFICATION WORKBENCH</p>
             <h2>Bring your evidence.</h2>
+            <p className="workspace-subtitle">Edit the inputs or load a fixture. Nothing is trusted until you press verify.</p>
           </div>
           <div className="fixture-strip">
             <span className="fixture-label">TRY A FIXTURE</span>
             {Object.entries(examples).map(([name, example]) => (
-              <button key={name} className={`fixture-button ${activeExample === name ? "is-active" : ""}`} onClick={() => loadExample(name)} type="button">
+              <button key={name} className={`fixture-button ${activeExample === name ? "is-active" : ""}`} onClick={() => loadExample(name)} type="button" aria-pressed={activeExample === name} disabled={isVerifying} title={example.description}>
                 <span className={`fixture-dot fixture-${name}`} />
                 {example.label}
               </button>
             ))}
+            {activeExample === "custom" && <span className="custom-state">CUSTOM INPUT</span>}
           </div>
         </div>
 
@@ -138,26 +197,32 @@ export function ActionProofConsole() {
               label="01 / CONTRACT"
               description="Expected behavior, allowed capabilities, and assertions."
               value={contractText}
-              onChange={setContractText}
+              onChange={(value) => updateEditor("contract", value)}
               lineCount={inputStats.contractLines}
+              disabled={isVerifying}
+              invalid={error?.field === "contract"}
+              errorMessage={error?.field === "contract" ? error.message : undefined}
             />
             <JsonEditor
               label="02 / EVIDENCE BUNDLE"
               description="Observed events, coverage, provenance, and integrity metadata."
               value={evidenceText}
-              onChange={setEvidenceText}
+              onChange={(value) => updateEditor("evidence", value)}
               lineCount={inputStats.evidenceLines}
+              disabled={isVerifying}
+              invalid={error?.field === "evidence"}
+              errorMessage={error?.field === "evidence" ? error.message : undefined}
             />
             <div className="input-actions">
               <button className="primary-button" onClick={verifyInput} type="button" disabled={isVerifying}>
                 <span>{isVerifying ? "Evaluating evidence" : "Verify evidence"}</span>
                 <span className="button-arrow" aria-hidden="true"><ArrowUpRight /></span>
               </button>
-              <span className="input-footnote">POST /api/verify · {formatBytes(inputStats.evidenceBytes)} evidence payload</span>
+              <span className="input-footnote">POST /api/verify · {formatBytes(inputStats.evidenceBytes)} evidence payload · {activeExample === "custom" ? "custom input" : "fixture input"}</span>
             </div>
           </section>
 
-          <ResultPanel result={result} error={error} isVerifying={isVerifying} />
+          <ResultPanel result={result} error={error} isVerifying={isVerifying} resultRef={resultRef} stale={resultIsStale} evidenceText={evidenceText} />
         </div>
       </section>
 
@@ -175,9 +240,10 @@ export function ActionProofConsole() {
   );
 }
 
-function JsonEditor({ label, description, value, onChange, lineCount }: { label: string; description: string; value: string; onChange: (value: string) => void; lineCount: number }) {
+function JsonEditor({ label, description, value, onChange, lineCount, disabled, invalid, errorMessage }: { label: string; description: string; value: string; onChange: (value: string) => void; lineCount: number; disabled: boolean; invalid: boolean; errorMessage?: string }) {
+  const editorId = label.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-");
   return (
-    <label className="json-editor">
+    <label className={`json-editor ${invalid ? "is-invalid" : ""}`}>
       <span className="editor-header">
         <span>
           <span className="editor-label">{label}</span>
@@ -185,22 +251,24 @@ function JsonEditor({ label, description, value, onChange, lineCount }: { label:
         </span>
         <span className="editor-count">{lineCount} lines</span>
       </span>
-      <textarea value={value} onChange={(event) => onChange(event.target.value)} spellCheck={false} aria-label={label} />
+      <textarea id={editorId} value={value} onChange={(event) => onChange(event.target.value)} spellCheck={false} aria-label={label} aria-invalid={invalid} aria-describedby={errorMessage ? `${editorId}-error` : undefined} disabled={disabled} />
+      {errorMessage && <span className="editor-error" id={`${editorId}-error`}>{errorMessage}</span>}
     </label>
   );
 }
 
-function ResultPanel({ result, error, isVerifying }: { result: VerificationResult | null; error: ApiError | null; isVerifying: boolean }) {
+function ResultPanel({ result, error, isVerifying, resultRef, stale, evidenceText }: { result: VerificationResult | null; error: ApiError | null; isVerifying: boolean; resultRef: RefObject<HTMLElement | null>; stale: boolean; evidenceText: string }) {
   if (isVerifying) {
-    return <section className="result-panel result-loading" aria-live="polite"><span className="loading-orbit" /><p>Replaying the contract against the submitted trace.</p><small>No browser opened. No model called.</small></section>;
+    return <section className="result-panel result-loading" ref={resultRef} aria-live="polite"><span className="loading-orbit" /><p>Replaying the contract against the submitted trace.</p><small>No browser opened. No model called.</small></section>;
   }
 
-  if (error) {
+  if (error && !result) {
     return (
-      <section className="result-panel result-error" aria-live="assertive">
+      <section className="result-panel result-error" ref={resultRef} aria-live="assertive">
         <div className="result-topline"><span className="result-status status-error">INPUT ERROR</span><span className="result-code">{error.code}</span></div>
         <h3>We could not make a conclusion.</h3>
         <p>{error.message}</p>
+        {error.field && <p className="error-location">Fix the {error.field} editor, then run verification again.</p>}
         {error.issues && error.issues.length > 0 && (
           <ul className="issue-list">
             {error.issues.slice(0, 8).map((issue, index) => <li key={`${issue.message}-${index}`}><span>!</span>{issue.path?.join(".") || "payload"}: {issue.message}</li>)}
@@ -212,7 +280,7 @@ function ResultPanel({ result, error, isVerifying }: { result: VerificationResul
 
   if (!result) {
     return (
-      <section className="result-panel result-empty" aria-live="polite">
+      <section className="result-panel result-empty" ref={resultRef} aria-live="polite">
         <div className="empty-crosshair" aria-hidden="true"><span /><span /></div>
         <div>
           <span className="result-status status-idle">AWAITING EVIDENCE</span>
@@ -226,15 +294,23 @@ function ResultPanel({ result, error, isVerifying }: { result: VerificationResul
   }
 
   const tone = statusTone(result.status);
+  const displayStale = stale || error?.code === "INPUT_CHANGED";
+  const eventMap = getEvidenceEventMap(evidenceText);
   return (
-    <section className={`result-panel result-${tone}`} aria-live="polite">
-      <div className="result-topline"><span className={`result-status status-${tone}`}>{result.status.replace("_", " ")}</span><span className="result-code">{result.verificationId.slice(0, 8)}</span></div>
+    <>
+      {error && <div className="result-error-inline" role="status"><strong>{error.code}</strong><span>{error.message}</span></div>}
+    <section className={`result-panel result-${tone}`} ref={resultRef} aria-live="polite">
+      <div className="result-topline"><span className={`result-status status-${tone}`}>{result.status.replace("_", " ")}</span><span className="result-code">{result.verificationId.slice(0, 8)} <CopyButton value={result.verificationId} label="Copy verification ID" /></span></div>
+      {displayStale && <div className="stale-banner" role="status"><span>RESULT STALE</span> Inputs changed after this verification. Run it again before relying on this verdict.</div>}
+      <div className="decision-kicker">DECISION / {result.evidence.provenance === "unverified" ? "UNVERIFIED PROVENANCE" : "EVIDENCE LINKED"}</div>
       <h3>{statusTitle(result.status)}</h3>
       <p>{statusDescription(result.status)}</p>
+      {result.evidence.provenance === "unverified" && <div className="trust-note"><span className="trust-mark">!</span><span>This verdict is based on structurally valid evidence. Its producer is not cryptographically verified.</span></div>}
 
       <div className="summary-grid" aria-label="Assertion summary">
         <SummaryCell value={result.summary.passed} label="passed" tone="pass" />
         <SummaryCell value={result.summary.failed} label="drift" tone="drift" />
+        <SummaryCell value={result.summary.blocked} label="blocked" tone="blocked" />
         <SummaryCell value={result.summary.unsafeEvents} label="unsafe events" tone="unsafe" />
         <SummaryCell value={result.summary.inconclusive} label="unknown" tone="unknown" />
       </div>
@@ -243,11 +319,19 @@ function ResultPanel({ result, error, isVerifying }: { result: VerificationResul
         <div className="section-heading"><span>ASSERTION TRACE</span><small>{result.assertionResults.length} checks</small></div>
         <div className="assertion-list">
           {result.assertionResults.map((assertion) => (
-            <div className="assertion-row" key={assertion.assertionId}>
-              <span className={`assertion-marker marker-${assertion.status}`} aria-hidden="true" />
-              <div className="assertion-main"><strong>{assertion.description || assertion.assertionId}</strong><span>{assertion.reasonCode.replaceAll("_", " ")}</span></div>
-              <div className="assertion-evidence">{assertion.evidenceEventIds.length > 0 ? assertion.evidenceEventIds.join(" · ") : "no linked event"}</div>
-            </div>
+            <details className="assertion-row" key={assertion.assertionId}>
+              <summary>
+                <span className={`assertion-marker marker-${assertion.status}`} aria-hidden="true" />
+                <div className="assertion-main"><strong>{assertion.description || assertion.assertionId}</strong><span>{assertionStatusLabel(assertion.status)} · {assertion.reasonCode.replaceAll("_", " ")}</span></div>
+                <div className="assertion-evidence">{assertion.evidenceEventIds.length > 0 ? assertion.evidenceEventIds.join(" · ") : "no linked event"}<ChevronDown /></div>
+              </summary>
+              <div className="assertion-detail">
+                <div><span>Expected</span><code>{formatValue(assertion.expected)}</code></div>
+                <div><span>Observed</span><code>{formatValue(assertion.observed)}</code></div>
+                <div><span>Linked events</span><code>{assertion.evidenceEventIds.length ? assertion.evidenceEventIds.join(", ") : "none"}</code></div>
+                {assertion.evidenceEventIds.length > 0 && <div className="event-excerpts"><span>Evidence excerpts</span>{assertion.evidenceEventIds.map((eventId) => <EventExcerpt key={eventId} event={eventMap.get(eventId)} fallbackId={eventId} />)}</div>}
+              </div>
+            </details>
           ))}
         </div>
       </div>
@@ -257,8 +341,8 @@ function ResultPanel({ result, error, isVerifying }: { result: VerificationResul
         <div className="detail-row"><span>Provenance</span><strong>{result.evidence.provenance.toUpperCase()}</strong></div>
         <div className="detail-row"><span>Chain</span><strong>{result.evidence.integrity.chain.toUpperCase()}</strong></div>
         <div className="detail-row"><span>Bundle hash</span><strong>{result.evidence.integrity.bundle.toUpperCase()}</strong></div>
-        <div className="detail-row"><span>Contract</span><code>{result.contract.hash.slice(0, 14)}…</code></div>
-        <div className="detail-row"><span>Evidence</span><code>{result.evidence.hash.slice(0, 14)}…</code></div>
+        <div className="detail-row"><span>Contract</span><code>{result.contract.hash.slice(0, 14)}… <CopyButton value={result.contract.hash} label="Copy contract hash" /></code></div>
+        <div className="detail-row"><span>Evidence</span><code>{result.evidence.hash.slice(0, 14)}… <CopyButton value={result.evidence.hash} label="Copy evidence hash" /></code></div>
       </div>
 
       <details className="raw-result">
@@ -266,11 +350,59 @@ function ResultPanel({ result, error, isVerifying }: { result: VerificationResul
         <pre>{JSON.stringify(result, null, 2)}</pre>
       </details>
     </section>
+    </>
   );
 }
 
 function SummaryCell({ value, label, tone }: { value: number; label: string; tone: string }) {
   return <div className={`summary-cell summary-${tone}`}><strong>{value}</strong><span>{label}</span></div>;
+}
+
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      className={`copy-button ${copied ? "is-copied" : ""}`}
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={async () => {
+        await navigator.clipboard?.writeText(value);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1200);
+      }}
+    >
+      {copied ? "COPIED" : "COPY"}
+    </button>
+  );
+}
+
+function assertionStatusLabel(status: VerificationResult["assertionResults"][number]["status"]): string {
+  if (status === "passed") return "Passed";
+  if (status === "failed") return "Drifted";
+  if (status === "blocked") return "Blocked";
+  if (status === "unsafe") return "Unsafe";
+  return "Not evaluable";
+}
+
+function formatValue(value: unknown): string {
+  if (value === undefined) return "not provided";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value);
+}
+
+function getEvidenceEventMap(value: string): Map<string, EvidenceBundle["events"][number]> {
+  try {
+    const parsed = JSON.parse(value) as EvidenceBundle;
+    return new Map((parsed.events ?? []).map((event) => [event.eventId, event]));
+  } catch {
+    return new Map();
+  }
+}
+
+function EventExcerpt({ event, fallbackId }: { event?: EvidenceBundle["events"][number]; fallbackId: string }) {
+  if (!event) return <code className="event-excerpt">{fallbackId} · event not found in current evidence</code>;
+  return <code className="event-excerpt"><strong>{event.eventId}</strong> · {event.type} · seq {event.sequence} · {event.occurredAt}<br />{formatValue(event.payload)}</code>;
 }
 
 function statusTone(status: VerificationResult["status"]): string {
