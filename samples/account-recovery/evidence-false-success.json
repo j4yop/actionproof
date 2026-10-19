@@ -1,0 +1,165 @@
+{
+  "schema": "actionproof.evidence/v1",
+  "bundleId": "bundle-recovery-false-success",
+  "contractRef": {
+    "contractId": "account.recovery",
+    "revision": 1
+  },
+  "run": {
+    "runId": "run-recovery-9",
+    "agentRef": "agent/support-demo",
+    "workflowRef": "account-recovery-v1",
+    "startedAt": "2026-10-20T09:00:00.000Z",
+    "endedAt": "2026-10-20T09:00:12.000Z",
+    "environment": "fixture-support"
+  },
+  "producer": {
+    "componentId": "fixture-collector",
+    "componentVersion": "1.0.0"
+  },
+  "coverage": {
+    "mode": "complete",
+    "startSequence": 1,
+    "endSequence": 9,
+    "observedEventTypes": [
+      "session.started",
+      "capability.used",
+      "navigation.committed",
+      "action.completed",
+      "session.completed"
+    ]
+  },
+  "events": [
+    {
+      "eventId": "session-started",
+      "sequence": 1,
+      "type": "session.started",
+      "occurredAt": "2026-10-20T09:00:00.000Z",
+      "actor": { "kind": "browser-agent", "ref": "agent/support-demo" },
+      "payload": { "workflow": "account-recovery-v1" },
+      "source": {
+        "sourceId": "collector/support",
+        "sourceKind": "browser-instrumentation",
+        "sourceVersion": "1.1.0",
+        "capturedAt": "2026-10-20T09:00:00.000Z"
+      }
+    },
+    {
+      "eventId": "navigate-capability",
+      "sequence": 2,
+      "type": "capability.used",
+      "occurredAt": "2026-10-20T09:00:02.000Z",
+      "actor": { "kind": "browser-agent", "ref": "agent/support-demo" },
+      "payload": { "capability": "navigate" },
+      "source": {
+        "sourceId": "collector/support",
+        "sourceKind": "browser-instrumentation",
+        "sourceVersion": "1.1.0",
+        "capturedAt": "2026-10-20T09:00:02.000Z"
+      }
+    },
+    {
+      "eventId": "recovery-page-opened",
+      "sequence": 3,
+      "type": "navigation.committed",
+      "occurredAt": "2026-10-20T09:00:02.000Z",
+      "actor": { "kind": "browser-agent", "ref": "agent/support-demo" },
+      "payload": { "url": { "origin": "https://app.example.com", "path": "/account/recovery" } },
+      "source": {
+        "sourceId": "collector/support",
+        "sourceKind": "browser-instrumentation",
+        "sourceVersion": "1.1.0",
+        "capturedAt": "2026-10-20T09:00:02.000Z"
+      }
+    },
+    {
+      "eventId": "type-capability",
+      "sequence": 4,
+      "type": "capability.used",
+      "occurredAt": "2026-10-20T09:00:05.000Z",
+      "actor": { "kind": "browser-agent", "ref": "agent/support-demo" },
+      "payload": { "capability": "type" },
+      "source": {
+        "sourceId": "collector/support",
+        "sourceKind": "browser-instrumentation",
+        "sourceVersion": "1.1.0",
+        "capturedAt": "2026-10-20T09:00:05.000Z"
+      }
+    },
+    {
+      "eventId": "identity-checked",
+      "sequence": 5,
+      "type": "action.completed",
+      "occurredAt": "2026-10-20T09:00:05.000Z",
+      "actor": { "kind": "browser-agent", "ref": "agent/support-demo" },
+      "payload": { "action": { "name": "identity-check" } },
+      "source": {
+        "sourceId": "collector/support",
+        "sourceKind": "browser-instrumentation",
+        "sourceVersion": "1.1.0",
+        "capturedAt": "2026-10-20T09:00:05.000Z"
+      }
+    },
+    {
+      "eventId": "submit-capability",
+      "sequence": 6,
+      "type": "capability.used",
+      "occurredAt": "2026-10-20T09:00:08.000Z",
+      "actor": { "kind": "browser-agent", "ref": "agent/support-demo" },
+      "payload": { "capability": "submit" },
+      "source": {
+        "sourceId": "collector/support",
+        "sourceKind": "browser-instrumentation",
+        "sourceVersion": "1.1.0",
+        "capturedAt": "2026-10-20T09:00:08.000Z"
+      }
+    },
+    {
+      "eventId": "password-reset",
+      "sequence": 7,
+      "type": "action.completed",
+      "occurredAt": "2026-10-20T09:00:08.000Z",
+      "actor": { "kind": "browser-agent", "ref": "agent/support-demo" },
+      "payload": { "action": { "name": "reset-password" } },
+      "source": {
+        "sourceId": "collector/support",
+        "sourceKind": "browser-instrumentation",
+        "sourceVersion": "1.1.0",
+        "capturedAt": "2026-10-20T09:00:08.000Z"
+      }
+    },
+    {
+      "eventId": "confirmation-shown",
+      "sequence": 8,
+      "type": "action.completed",
+      "occurredAt": "2026-10-20T09:00:10.000Z",
+      "actor": { "kind": "browser-agent", "ref": "agent/support-demo" },
+      "payload": { "action": { "name": "confirm-recovery" } },
+      "source": {
+        "sourceId": "collector/support",
+        "sourceKind": "browser-instrumentation",
+        "sourceVersion": "1.1.0",
+        "capturedAt": "2026-10-20T09:00:10.000Z"
+      }
+    },
+    {
+      "eventId": "session-completed",
+      "sequence": 9,
+      "type": "session.completed",
+      "occurredAt": "2026-10-20T09:00:12.000Z",
+      "actor": { "kind": "browser-agent", "ref": "agent/support-demo" },
+      "payload": { "outcome": "success" },
+      "source": {
+        "sourceId": "collector/support",
+        "sourceKind": "browser-instrumentation",
+        "sourceVersion": "1.1.0",
+        "capturedAt": "2026-10-20T09:00:12.000Z"
+      }
+    }
+  ],
+  "provenance": {
+    "captureId": "capture-recovery-2",
+    "collector": { "componentId": "fixture-collector", "componentVersion": "1.0.0" },
+    "integrity": { "canonicalization": "none", "hashAlgorithm": "none", "chain": "none" }
+  }
+}
