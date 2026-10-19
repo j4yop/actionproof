@@ -196,13 +196,20 @@ export function ActionProofConsole() {
         <div className="workspace-heading">
           <div>
             <h2>Bring your evidence.</h2>
-            <p className="workspace-subtitle">Edit the inputs or load a fixture. Nothing is trusted until you press verify.</p>
+            <p className="workspace-subtitle">Load a verified path or an adversarial scenario. Every scenario runs through the live verifier — nothing is trusted until you press verify.</p>
           </div>
           <div className="fixture-strip">
-            <span className="fixture-label">TRY A FIXTURE</span>
-            {Object.entries(examples).map(([name, example]) => (
+            <span className="fixture-label">VERIFIED PATH</span>
+            {Object.entries(examples).filter(([, example]) => example.category === "verified").map(([name, example]) => (
               <button key={name} className={`fixture-button ${activeExample === name ? "is-active" : ""}`} onClick={() => loadExample(name)} type="button" aria-pressed={activeExample === name} disabled={isVerifying} title={example.description}>
-                <span className={`fixture-dot fixture-${name}`} />
+                <span className={`fixture-dot fixture-${example.tone}`} />
+                {example.label}
+              </button>
+            ))}
+            <span className="fixture-label fixture-label-adversarial">ADVERSARIAL GALLERY</span>
+            {Object.entries(examples).filter(([, example]) => example.category === "adversarial").map(([name, example]) => (
+              <button key={name} className={`fixture-button ${activeExample === name ? "is-active" : ""}`} onClick={() => loadExample(name)} type="button" aria-pressed={activeExample === name} disabled={isVerifying} title={example.description}>
+                <span className={`fixture-dot fixture-${example.tone}`} />
                 {example.label}
               </button>
             ))}
