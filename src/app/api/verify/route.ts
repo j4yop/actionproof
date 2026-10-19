@@ -2,11 +2,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { contractSchema, evidenceSchema } from "@/domain/actionproof/schemas";
 import { stableStringify } from "@/domain/actionproof/stable-json";
+import { VERIFIER_PROFILE, VERIFIER_VERSION } from "@/domain/actionproof/profile";
 import { VerificationInputError, verify } from "@/domain/actionproof/verify";
 
 const MAX_BODY_BYTES = 512_000;
-const VERIFIER_VERSION = "1.1.0";
-const PROFILE_ID = "actionproof-web-v1.1";
+const PROFILE_ID = VERIFIER_PROFILE.id;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 60;
 const requestBuckets = new Map<string, { startedAt: number; count: number }>();
