@@ -137,6 +137,11 @@ async function readBodyWithinLimit(request: Request, limit: number): Promise<str
 
 function checkRateLimit(request: Request): { allowed: boolean; retryAfterSeconds: number } {
   const now = Date.now();
+  if (requestBuckets.size > 10_000) {
+    for (const [key, bucket] of requestBuckets) {
+      if (now - bucket.startedAt >= RATE_LIMIT_WINDOW_MS) requestBuckets.delete(key);
+    }
+  }
   const identity = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "anonymous";
   const current = requestBuckets.get(identity);
 
