@@ -1,140 +1,127 @@
 # ActionProof
 
-**Prove the action. Not the claim.**
+### Prove the action. Not the claim.
 
-ActionProof is a live, deterministic verifier for browser-agent evidence. A user submits two structured JSON documents:
+**Live console:** https://actionproof-one.vercel.app
+**Repository:** https://github.com/j4yop/actionproof
+**Track:** Developer Tools & Open Source
 
-1. A **contract** describing the behavior that should be allowed and observed.
-2. An **evidence bundle** describing what the agent, browser, policy gate, and collector actually observed.
-
-ActionProof returns an explainable verdict and links every assertion result back to the event IDs that support it. The current verifier profile is `actionproof-web-v1.1`.
+ActionProof is a deterministic, fail-closed verifier for browser-agent evidence. It accepts a workflow contract and an evidence bundle, then returns an explainable verdict linked to the exact events that support it.
 
 ## The problem
 
-Browser agents can report success even when:
+Browser agents can claim success when:
 
 - a click never fired;
-- the page changed underneath the agent;
-- a success-looking toast appeared without the expected request;
-- the agent bypassed a disabled or readonly control;
-- the evidence trace is incomplete, stale, or contradictory.
+- the UI changed underneath the agent;
+- a success message appeared without the expected request;
+- a disabled control was bypassed;
+- the evidence trace is partial, stale, or contradictory.
 
-A final screenshot or the agent's own final sentence is not enough to establish that an action happened, that it was authorized, or that the evidence was complete.
+A final screenshot or the agent’s own final message is not enough to prove that an action happened, was authorized, or was fully observed.
 
-## Questions ActionProof answers
+## The questions we ask
 
-For a declared workflow, the verifier asks:
+For every submitted workflow, ActionProof asks:
 
-| Question | Evidence used |
-| --- | --- |
-| Did the expected event happen? | Event type, JSON-pointer predicates, and count bounds |
-| Did events happen in the required order? | Monotonic event sequence numbers |
-| Did the run stay inside the declared capability boundary? | Forbidden-event assertions and policy events |
-| Did the workflow stay within a duration budget? | Explicit start/end event timestamps |
-| Can a missing event be treated as a failure? | Coverage mode, declared gaps, and required event types |
-| Can the result be trusted as a complete conclusion? | Provenance, integrity metadata, and fail-closed classification |
+1. Did the expected events happen?
+2. Did they happen in the required order?
+3. Did the run stay inside the allowed origin and capability scope?
+4. Did it stay inside the declared time and identity boundaries?
+5. Is the evidence complete and internally consistent?
+6. Was a forbidden capability, bypass, or policy block observed?
+7. Is there enough trustworthy evidence to make a decisive conclusion?
 
 ## The solution
 
-ActionProof separates three responsibilities:
+ActionProof separates the problem into three data-driven layers:
 
-- **Contracts express expectations.** They are versioned JSON and contain a finite assertion DSL.
-- **Evidence records observations.** Events are ordered, typed, attributed, and linked to capture provenance.
-- **The verifier makes the conclusion.** It is a pure deterministic function with no browser, network, clock, or LLM dependency.
+```text
+Contract     → what should happen
+Evidence     → what was observed
+Verifier     → what the evidence proves
+```
 
-The public result taxonomy is:
+The verifier evaluates a finite assertion language for event presence, absence, ordering, duration, and forbidden events. It also validates coverage, scope, identity, timing, resource limits, and optional cryptographic hash-chain integrity.
 
-| Result | Meaning |
+It does not open a browser, call an LLM, fetch remote artifacts, or execute user-provided code during verification.
+
+## Verdicts
+
+| Verdict | Meaning |
 | --- | --- |
-| `PASS` | Required assertions passed with complete enough coverage. |
-| `DRIFT` | Evidence is complete, but required behavior differs from the contract. |
-| `BLOCKED` | A policy or action gate explicitly stopped the required flow. |
+| `PASS` | Required behavior passed with complete, admissible evidence. |
+| `DRIFT` | Evidence is complete, but behavior differs from the contract. |
+| `BLOCKED` | A typed policy or action gate stopped the workflow. |
 | `UNSAFE_BYPASS` | A forbidden capability or bypass was observed. |
-| `INCONCLUSIVE` | Evidence is missing, partial, contradictory, or not strong enough to conclude. |
+| `INCONCLUSIVE` | Evidence is missing, contradictory, out of scope, or not trustworthy enough. |
 
-Invalid JSON and invalid schemas are API errors, not verification results.
+Precedence is:
 
-## Live console workflow
+```text
+UNSAFE_BYPASS > BLOCKED > INCONCLUSIVE > DRIFT > PASS
+```
 
-1. Open the deployed ActionProof console.
-2. Load a fixture or paste a contract and evidence bundle.
-3. Press **Verify evidence**.
-4. The browser sends the two documents to `POST /api/verify`.
-5. The API validates the transport shape and domain references.
-6. The pure verifier evaluates the assertions against the submitted events.
-7. The console renders the verdict, summary, event references, coverage, provenance, hashes, and machine-readable receipt.
+Missing evidence never silently becomes `PASS`.
 
-The fixture buttons are only input presets. They do not contain or display precomputed verdicts. Every fixture is sent through the same API and verifier path as custom judge input.
+## How it works
 
-For stricter workflows, contracts can require hash-chain integrity. In that mode ActionProof validates canonical event hashes, predecessor links, and the bundle hash before it can return `PASS`. Signed evidence remains `INCONCLUSIVE` until a trusted-key resolver is configured; a self-declared signature is never treated as verified.
+1. Open the [live console](https://actionproof-one.vercel.app).
+2. Load a fixture or paste your own contract and evidence JSON.
+3. Select **Verify evidence**.
+4. `POST /api/verify` validates the request and resource limits.
+5. The domain verifier checks integrity, coverage, timing, identity, scope, blocks, and assertions.
+6. The console renders the verdict, reason codes, evidence event IDs, coverage, provenance, hashes, and machine-readable receipt.
+
+The fixture buttons only load example **inputs**. They do not contain precomputed verdicts; every run goes through the same live API path used by custom judge input.
 
 ## Architecture
 
 ```text
-┌─────────────────────┐       POST /api/verify       ┌─────────────────────────┐
-│  Live console       │ ───────────────────────────▶ │  Next.js Route Handler  │
-│  Contract editor    │                              │  JSON + size validation │
-│  Evidence editor    │ ◀─────────────────────────── │  HTTP error mapping     │
-└─────────────────────┘          result              └───────────┬─────────────┘
-                                                                │
-                                                                ▼
-                                                     ┌─────────────────────────┐
-                                                     │  ActionProof domain      │
-                                                     │  schema + domain checks  │
-                                                     │  assertion evaluation    │
-                                                     │  result classification    │
-                                                     └───────────┬─────────────┘
-                                                                │
-                                                                ▼
-                                                     ┌─────────────────────────┐
-                                                     │  Verification receipt    │
-                                                     │  status + reason codes   │
-                                                     │  event IDs + hashes      │
-                                                     └─────────────────────────┘
+┌──────────────────┐       POST /api/verify       ┌────────────────────┐
+│ Live web console  │ ──────────────────────────▶ │ Next.js API route  │
+│ JSON inputs       │ ◀────────────────────────── │ schema + limits    │
+└──────────────────┘           receipt            └─────────┬──────────┘
+                                                           ▼
+                                                ┌────────────────────┐
+                                                │ Pure domain        │
+                                                │ validation         │
+                                                │ integrity          │
+                                                │ scope + coverage   │
+                                                │ assertion engine   │
+                                                └─────────┬──────────┘
+                                                          ▼
+                                                Explainable verdict
 ```
 
-The domain verifier does not import Next.js, React, browser APIs, network clients, or an LLM SDK. The route handler owns HTTP concerns; the UI owns presentation; the domain owns the conclusion.
-
-## Repository map
-
-```text
-src/
-  app/
-    api/verify/route.ts       HTTP boundary and hashing context
-    page.tsx                  Live console entry point
-    globals.css               Forensic control-room visual system
-  components/
-    actionproof-console.tsx   Interactive editors and result view
-  domain/actionproof/
-    types.ts                  Public protocol types
-    schemas.ts                Strict runtime input schemas
-    validation.ts             Cross-document domain validation
-    verify.ts                 Pure assertion evaluation and classification
-    examples.ts               Committed input fixtures, not result fixtures
-    stable-json.ts            Deterministic object comparison/fingerprints
-docs/
-  architecture.md             Module and deployment boundaries
-  verification-model.md       Contract, evidence, and result semantics
-```
+The domain verifier is independent of Next.js, React, browser APIs, network clients, and model SDKs.
 
 ## Tech stack
 
 - Next.js 16 App Router
-- TypeScript 5.9 with strict checking
 - React 19
-- Zod 4 for runtime JSON validation
-- Vitest for domain tests
-- Vercel for the public deployment
-- No runtime database, browser automation, external model, or API key required for the MVP
+- TypeScript 5.9, strict mode
+- Zod 4 runtime schemas
+- JCS canonicalization with SHA-256 integrity checks
+- Vitest 4 regression and API tests
+- Vercel production deployment
 
-## Run locally
+No database, credentials, hosted model, or browser automation runtime is required for the current MVP.
+
+## Verification boundaries
+
+ActionProof verifies the evidence bundle it receives. It does not independently prove that an untrusted collector captured every real-world action. Stronger trust comes from trusted browser instrumentation, policy gates, network capture, and signed evidence producers.
+
+Signed evidence is intentionally fail-closed until a trusted-key resolver is configured. A self-declared signature is never treated as verified.
+
+## Local development
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open http://localhost:3000.
 
 ## Checks
 
@@ -142,34 +129,11 @@ Open `http://localhost:3000`.
 npm run typecheck
 npm test
 npm run build
+npm audit
 ```
 
-The buildathon-style check can run against the production server:
+Current repository checks include **18 tests** and report **0 npm audit vulnerabilities**.
 
-```bash
-npm run build
-npm start
-```
+## Built with OmniRush
 
-## Scope boundaries
-
-ActionProof does not claim to be:
-
-- a browser agent;
-- a general browser replay engine;
-- a screenshot or DOM truth oracle;
-- an LLM trajectory judge;
-- a complete sandbox for arbitrary untrusted code;
-- a security certification or compliance framework.
-
-It verifies structured evidence according to explicit contracts and reports when that evidence is not sufficient.
-
-## Design principles
-
-- Missing evidence never silently becomes `PASS`.
-- Declared integrity is not accepted without matching cryptographic material.
-- Declared scope, identity, coverage, and timing must be evidenced before a decisive result.
-- A confirmed unsafe path takes precedence over a successful-looking outcome.
-- Event sequence, not clock skew, establishes ordering.
-- User-provided expectations are data, not code.
-- The live UI and API share the same dynamic verification path.
+OmniRush was used for the product research, architecture, implementation, adversarial review, test design, hardening, and deployment workflow. The result is a deterministic product that does not require generative AI at runtime.
