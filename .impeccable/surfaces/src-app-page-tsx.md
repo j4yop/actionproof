@@ -15,14 +15,14 @@ Developers, reviewers, and buildathon judges bring structured JSON from a browse
 
 ## Direction contract
 
-**THESIS:** Treat the console as a forensic control room: evidence enters as structured material, the verifier makes a bounded determination, and every conclusion points back to an observable event. Refuse the category default of a chat-like AI assistant or decorative dashboard.
+**THESIS:** Treat the console as a proof ledger: evidence enters as two structured documents, the verifier makes a bounded determination, and every conclusion points back to an observable event. Refuse both the chat-like AI assistant and dark terminal defaults.
 
-**OWN-WORLD:** Near-black instrument surfaces, cool blue-white text, restrained cyan for verified structure, amber for uncertainty, red for safety violations, and neutral ruled panels for evidence. Use a precise sans for interface copy and a mono face only for JSON, event IDs, hashes, and measurements. Edges are crisp; depth comes from one soft elevation system, not floating card stacks.
+**OWN-WORLD:** Cool paper-grey ground, white evidence sheets, ink-blue typography, cobalt actions, amber uncertainty, red safety violations, and green confirmation. Use a precise sans for interface copy and a mono face only for JSON, event IDs, hashes, reason codes, and measurements. Edges are crisp, corners are square, and depth comes from one paper-sheet shadow.
 
 **STORY:** The visitor starts with the problem statement and two input documents. They can load an example or provide their own JSON, run the verifier, see a single verdict with confidence language, then walk through assertion results, event references, coverage, provenance, and the raw receipt. The UI teaches the trust boundary while it performs the task.
 
-**FIRST VIEWPORT:** A compact top rail names ActionProof and shows the runtime promise: deterministic, offline-ready, no LLM. The main split is an input workbench on the left and a quiet “awaiting evidence” result well on the right. A clear Verify evidence button anchors the workbench. Once run, the right well becomes the verdict and assertion summary without changing page geometry.
+**FIRST VIEWPORT:** A compact top rail names ActionProof and shows the runtime promise: deterministic, offline-ready, no LLM. The opening is a proof desk: a large ink-blue statement and three short trust steps sit above a split input/result workbench. White contract and evidence sheets occupy the left; a quiet verdict report waits on the right. The cobalt Verify evidence button anchors the sheets, and the right report changes state without changing the page grammar.
 
-**FORM:** Forensic control room, assigned as the operational visual direction for the greenfield console. Its signature interaction is the verdict transition: the result well changes from an empty evidence state to a color-coded, evidence-linked decision while the input panes remain available for iteration.
+**FORM:** Signal Ledger, a cool editorial evidence desk rather than a terminal. Its signature interaction is the verdict transition: the blank report becomes a stamped, color-coded, evidence-linked decision while the input sheets remain available for iteration.
 
 **FINISH:** unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance

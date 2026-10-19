@@ -161,7 +161,7 @@ export function ActionProofConsole() {
 
       <section className="intro" id="top">
         <div className="intro-copy">
-          <h1>Prove the action.<br className="headline-break" /><em>Not the claim.</em></h1>
+          <h1>Prove the action.<br className="headline-break" /> <em>Not the claim.</em></h1>
           <p className="lede">
             A deterministic evidence check for browser-agent runs. Submit the expectation, submit the trace, and see exactly what the trace can prove.
           </p>
