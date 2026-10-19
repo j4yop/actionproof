@@ -7,14 +7,10 @@ import { BundleIO } from "@/components/bundle-io";
 import { EvidenceExplorer } from "@/components/evidence-explorer";
 import { JudgeMode } from "@/components/judge-mode";
 import { ReceiptActions } from "@/components/receipt-actions";
+import { buildAnnouncement, buildErrorSummary, EDITOR_IDS, type Announcement, type ApiErrorShape } from "@/domain/actionproof/accessibility";
 import type { EvidenceBundle, VerificationResult } from "@/domain/actionproof/types";
 
-type ApiError = {
-  code: string;
-  message: string;
-  issues?: Array<{ path?: Array<string | number>; message: string }>;
-  field?: "contract" | "evidence";
-};
+type ApiError = ApiErrorShape;
 
 const initialExample = getExample("pass");
 
@@ -28,6 +24,7 @@ export function ActionProofConsole() {
   const [verifiedInput, setVerifiedInput] = useState<{ contract: string; evidence: string } | null>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [inputMode, setInputMode] = useState<"guided" | "expert">("guided");
+  const [announcement, setAnnouncement] = useState<string>("");
   const workbenchRef = useRef<HTMLElement>(null);
   const resultRef = useRef<HTMLElement>(null);
 
@@ -52,6 +49,7 @@ export function ActionProofConsole() {
 
   async function verifyInput() {
     setError(null);
+    setAnnouncement(buildAnnouncement({ kind: "started" }));
     setIsVerifying(true);
 
     let contract: unknown;
@@ -69,7 +67,9 @@ export function ActionProofConsole() {
       evidenceError = { code: "INVALID_JSON", message: "The evidence editor contains invalid JSON.", field: "evidence" };
     }
     if (contractError || evidenceError) {
-      setError(contractError ?? evidenceError);
+      const failure = contractError ?? evidenceError!;
+      setError(failure);
+      setAnnouncement(buildAnnouncement({ kind: "failed", message: failure.message }));
       requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" }));
       setIsVerifying(false);
       return;
@@ -90,14 +90,17 @@ export function ActionProofConsole() {
         const apiError = body.error ?? { code: "UNKNOWN_ERROR", message: "The verifier did not return a result." };
         const field = apiError.issues?.[0]?.path?.[0];
         setError({ ...apiError, field: field === "contract" || field === "evidence" ? field : undefined });
+        setAnnouncement(buildAnnouncement({ kind: "failed", message: apiError.message }));
         requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" }));
         return;
       }
       setResult(body.result);
       setVerifiedInput(inputSnapshot);
+      setAnnouncement(buildAnnouncement({ kind: "completed", status: body.result.status }));
       requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" }));
     } catch {
       setError({ code: "NETWORK_ERROR", message: "The verification request could not reach the live API." });
+      setAnnouncement(buildAnnouncement({ kind: "failed", message: "The verification request could not reach the live API." }));
       requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" }));
     } finally {
       setIsVerifying(false);
@@ -151,6 +154,7 @@ export function ActionProofConsole() {
 
   return (
     <main className="app-shell">
+      <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
       <header className="top-rail">
         <a className="brand" href="#top" aria-label="ActionProof home">
           <span className="brand-mark" aria-hidden="true">
@@ -291,7 +295,7 @@ export function ActionProofConsole() {
             />
           </section>
 
-          <ResultPanel result={result} error={error} isVerifying={isVerifying} resultRef={resultRef} stale={resultIsStale} contractText={contractText} evidenceText={evidenceText} />
+          <ResultPanel result={result} error={error} isVerifying={isVerifying} resultRef={resultRef} stale={resultIsStale} contractText={contractText} evidenceText={evidenceText} prefersReducedMotion={prefersReducedMotion} />
         </div>
       </section>
 
@@ -325,18 +329,45 @@ function JsonEditor({ label, description, value, onChange, lineCount, disabled, 
   );
 }
 
-function ResultPanel({ result, error, isVerifying, resultRef, stale, contractText, evidenceText }: { result: VerificationResult | null; error: ApiError | null; isVerifying: boolean; resultRef: RefObject<HTMLElement | null>; stale: boolean; contractText: string; evidenceText: string }) {
+function ResultPanel({ result, error, isVerifying, resultRef, stale, contractText, evidenceText, prefersReducedMotion }: { result: VerificationResult | null; error: ApiError | null; isVerifying: boolean; resultRef: RefObject<HTMLElement | null>; stale: boolean; contractText: string; evidenceText: string; prefersReducedMotion: boolean }) {
   if (isVerifying) {
     return <section className="result-panel result-loading" ref={resultRef} aria-live="polite"><span className="loading-orbit" /><p>Replaying the contract against the submitted trace.</p><small>No browser opened. No model called.</small></section>;
   }
 
   if (error && !result) {
+    const summary = buildErrorSummary(error);
     return (
       <section className="result-panel result-error" ref={resultRef} aria-live="assertive">
         <div className="result-topline"><span className="result-status status-error">INPUT ERROR</span><span className="result-code">{error.code}</span></div>
         <h3>We could not make a conclusion.</h3>
         <p>{error.message}</p>
-        {error.field && <p className="error-location">Fix the {error.field} editor, then run verification again.</p>}
+        {summary.length > 0 && (
+          <div className="error-summary" role="group" aria-label="Input problems">
+            <span className="error-summary-title">Problems found</span>
+            <ul>
+              {summary.map((entry) => (
+                <li key={entry.field}>
+                  {entry.field === "payload" ? (
+                    <span className="error-summary-link is-static">{entry.label} — {entry.issueCount} problem{entry.issueCount === 1 ? "" : "s"}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="error-summary-link"
+                      onClick={() => {
+                        const editorId = entry.field === "contract" ? EDITOR_IDS.contract : EDITOR_IDS.evidence;
+                        const target = document.getElementById(editorId);
+                        target?.focus();
+                        target?.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "center" });
+                      }}
+                    >
+                      {entry.label} — {entry.issueCount} problem{entry.issueCount === 1 ? "" : "s"}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {error.issues && error.issues.length > 0 && (
           <ul className="issue-list">
             {error.issues.slice(0, 8).map((issue, index) => <li key={`${issue.message}-${index}`}><span>!</span>{issue.path?.join(".") || "payload"}: {issue.message}</li>)}
