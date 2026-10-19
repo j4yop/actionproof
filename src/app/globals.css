@@ -2705,3 +2705,147 @@ summary:focus-visible {
 .fixture-button[title] {
   text-transform: none;
 }
+
+/* --- Judge mode --- */
+
+.judge-mode {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 34px 0 38px;
+  display: grid;
+  gap: 22px;
+}
+
+.judge-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) auto;
+  gap: 24px;
+  align-items: end;
+}
+
+.judge-kicker {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  color: var(--subtle);
+}
+
+.judge-heading h2 {
+  margin: 6px 0 8px;
+  font-size: 1.7rem;
+  letter-spacing: -0.02em;
+}
+
+.judge-lede {
+  margin: 0;
+  color: var(--muted);
+  max-width: 68ch;
+}
+
+.judge-actions {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.judge-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.judge-step {
+  border: 1px solid var(--line-soft);
+  background: var(--surface);
+  padding: 16px 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.judge-step.is-done { border-color: var(--line); }
+
+.judge-step-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.judge-step-index {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+.judge-step-copy { display: grid; gap: 2px; }
+.judge-step-copy strong { font-size: 0.98rem; }
+.judge-step-copy span { color: var(--muted); font-size: 0.84rem; }
+
+.judge-run-button {
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--ink);
+  padding: 8px 14px;
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.judge-run-button:hover:not(:disabled) { border-color: var(--cyan-strong); color: var(--cyan); }
+.judge-run-button:disabled { opacity: 0.6; cursor: default; }
+
+.judge-step-verdict { display: grid; gap: 10px; }
+
+.judge-verdict-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.judge-verdict-note { color: var(--muted); font-size: 0.84rem; }
+
+.judge-decisive {
+  display: grid;
+  gap: 6px;
+  border-left: 2px solid var(--cyan-strong);
+  padding-left: 12px;
+}
+
+.judge-decisive > span {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--subtle);
+}
+
+.judge-decisive code {
+  display: grid;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.judge-event {
+  color: var(--ink);
+  font-size: 0.78rem;
+}
+
+.judge-error {
+  margin: 0;
+  color: var(--red);
+  font-size: 0.84rem;
+}
+
+@media (max-width: 760px) {
+  .judge-heading { grid-template-columns: 1fr; }
+  .judge-step-head { grid-template-columns: auto 1fr; }
+  .judge-run-button { grid-column: 2; justify-self: start; }
+}

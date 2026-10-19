@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { examples, getExample } from "@/domain/actionproof/examples";
 import { ContractWizard } from "@/components/contract-wizard";
+import { JudgeMode } from "@/components/judge-mode";
 import type { EvidenceBundle, VerificationResult } from "@/domain/actionproof/types";
 
 type ApiError = {
@@ -183,6 +184,7 @@ export function ActionProofConsole() {
               <span className="button-arrow" aria-hidden="true"><ArrowUpRight /></span>
             </button>
             <button className="text-button" onClick={scrollToWorkbench} type="button">Open workbench <span>↓</span></button>
+            <a className="text-button" href="#judge-mode">Judge mode <span>↓</span></a>
           </div>
         </div>
         <div className="intro-notes" aria-label="What ActionProof answers">
@@ -191,6 +193,8 @@ export function ActionProofConsole() {
           <div className="note-line"><p>Verdict</p><small>What the trace proves</small></div>
         </div>
       </section>
+
+      <JudgeMode />
 
       <section className="workspace" aria-label="ActionProof verification workspace" ref={workbenchRef}>
         <div className="workspace-heading">
