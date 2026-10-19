@@ -12,6 +12,7 @@ ActionProof is an operational evidence console for developers and judges. The in
 - **Type:** precise sans for interface copy; monospace only for JSON, IDs, hashes, reason codes, and measurements.
 - **Geometry:** mostly crisp rectangles with a small, consistent radius vocabulary. Rules and alignment do the organizational work.
 - **Depth:** one soft shadow language; no glass, gradients, glow, or decorative card nesting.
+- **Hierarchy:** headings and the task controls carry the page; repeated kicker labels and decorative section numbering stay out of the way.
 
 ## Interaction language
 

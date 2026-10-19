@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { examples, getExample } from "@/domain/actionproof/examples";
 import type { EvidenceBundle, VerificationResult } from "@/domain/actionproof/types";
 
@@ -21,8 +21,17 @@ export function ActionProofConsole() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [activeExample, setActiveExample] = useState("pass");
   const [verifiedInput, setVerifiedInput] = useState<{ contract: string; evidence: string } | null>(null);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const workbenchRef = useRef<HTMLElement>(null);
   const resultRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updateMotionPreference = () => setPrefersReducedMotion(mediaQuery.matches);
+    updateMotionPreference();
+    mediaQuery.addEventListener("change", updateMotionPreference);
+    return () => mediaQuery.removeEventListener("change", updateMotionPreference);
+  }, []);
 
   const resultIsStale = Boolean(result && verifiedInput && (verifiedInput.contract !== contractText || verifiedInput.evidence !== evidenceText));
 
@@ -55,7 +64,7 @@ export function ActionProofConsole() {
     }
     if (contractError || evidenceError) {
       setError(contractError ?? evidenceError);
-      requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" }));
       setIsVerifying(false);
       return;
     }
@@ -75,15 +84,15 @@ export function ActionProofConsole() {
         const apiError = body.error ?? { code: "UNKNOWN_ERROR", message: "The verifier did not return a result." };
         const field = apiError.issues?.[0]?.path?.[0];
         setError({ ...apiError, field: field === "contract" || field === "evidence" ? field : undefined });
-        requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+        requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" }));
         return;
       }
       setResult(body.result);
       setVerifiedInput(inputSnapshot);
-      requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" }));
     } catch {
       setError({ code: "NETWORK_ERROR", message: "The verification request could not reach the live API." });
-      requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" }));
     } finally {
       setIsVerifying(false);
     }
@@ -121,7 +130,7 @@ export function ActionProofConsole() {
   }
 
   function scrollToWorkbench() {
-    workbenchRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    workbenchRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
   }
 
   return (
@@ -152,8 +161,7 @@ export function ActionProofConsole() {
 
       <section className="intro" id="top">
         <div className="intro-copy">
-          <p className="eyebrow">BROWSER-AGENT TRUST BOUNDARY / V1.1</p>
-          <h1>Prove the action.<br /><em>Not the claim.</em></h1>
+          <h1>Prove the action.<br className="headline-break" /><em>Not the claim.</em></h1>
           <p className="lede">
             A deterministic evidence check for browser-agent runs. Submit the expectation, submit the trace, and see exactly what the trace can prove.
           </p>
@@ -166,16 +174,15 @@ export function ActionProofConsole() {
           </div>
         </div>
         <div className="intro-notes" aria-label="What ActionProof answers">
-          <div className="note-line"><span>01</span><p>Contract</p><small>What should happen</small></div>
-          <div className="note-line"><span>02</span><p>Evidence</p><small>What was observed</small></div>
-          <div className="note-line"><span>03</span><p>Verdict</p><small>What the trace proves</small></div>
+          <div className="note-line"><p>Contract</p><small>What should happen</small></div>
+          <div className="note-line"><p>Evidence</p><small>What was observed</small></div>
+          <div className="note-line"><p>Verdict</p><small>What the trace proves</small></div>
         </div>
       </section>
 
       <section className="workspace" aria-label="ActionProof verification workspace" ref={workbenchRef}>
         <div className="workspace-heading">
           <div>
-            <p className="eyebrow">VERIFICATION WORKBENCH</p>
             <h2>Bring your evidence.</h2>
             <p className="workspace-subtitle">Edit the inputs or load a fixture. Nothing is trusted until you press verify.</p>
           </div>
@@ -194,7 +201,7 @@ export function ActionProofConsole() {
         <div className="workspace-grid">
           <section className="input-column" aria-label="Verification inputs">
             <JsonEditor
-              label="01 / CONTRACT"
+              label="CONTRACT"
               description="Expected behavior, allowed capabilities, and assertions."
               value={contractText}
               onChange={(value) => updateEditor("contract", value)}
@@ -204,7 +211,7 @@ export function ActionProofConsole() {
               errorMessage={error?.field === "contract" ? error.message : undefined}
             />
             <JsonEditor
-              label="02 / EVIDENCE BUNDLE"
+              label="EVIDENCE BUNDLE"
               description="Observed events, coverage, provenance, and integrity metadata."
               value={evidenceText}
               onChange={(value) => updateEditor("evidence", value)}
@@ -228,7 +235,6 @@ export function ActionProofConsole() {
 
       <footer className="site-footer">
         <div>
-          <span className="footer-kicker">THE TRUST MODEL</span>
           <p>Contracts express expectations. Evidence records observations. The verifier makes the conclusion.</p>
         </div>
         <div className="footer-right">
@@ -302,7 +308,6 @@ function ResultPanel({ result, error, isVerifying, resultRef, stale, evidenceTex
     <section className={`result-panel result-${tone}`} ref={resultRef} aria-live="polite">
       <div className="result-topline"><span className={`result-status status-${tone}`}>{result.status.replace("_", " ")}</span><span className="result-code">{result.verificationId.slice(0, 8)} <CopyButton value={result.verificationId} label="Copy verification ID" /></span></div>
       {displayStale && <div className="stale-banner" role="status"><span>RESULT STALE</span> Inputs changed after this verification. Run it again before relying on this verdict.</div>}
-      <div className="decision-kicker">DECISION / {result.evidence.provenance === "unverified" ? "UNVERIFIED PROVENANCE" : "EVIDENCE LINKED"}</div>
       <h3>{statusTitle(result.status)}</h3>
       <p>{statusDescription(result.status)}</p>
       {result.evidence.provenance === "unverified" && <div className="trust-note"><span className="trust-mark">!</span><span>This verdict is based on structurally valid evidence. Its producer is not cryptographically verified.</span></div>}
@@ -367,9 +372,14 @@ function CopyButton({ value, label }: { value: string; label: string }) {
       aria-label={label}
       title={label}
       onClick={async () => {
-        await navigator.clipboard?.writeText(value);
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 1200);
+        try {
+          if (!navigator.clipboard) throw new Error("Clipboard unavailable");
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1200);
+        } catch {
+          setCopied(false);
+        }
       }}
     >
       {copied ? "COPIED" : "COPY"}
