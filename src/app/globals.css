@@ -2691,3 +2691,17 @@ summary:focus-visible {
   .action-fields { grid-template-columns: 1fr; }
   .mode-note { width: 100%; }
 }
+
+/* --- Adversarial scenario gallery --- */
+
+.fixture-label-adversarial {
+  margin-left: 10px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+
+.fixture-blocked { background: var(--blue); }
+
+.fixture-button[title] {
+  text-transform: none;
+}
