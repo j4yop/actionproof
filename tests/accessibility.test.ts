@@ -52,6 +52,13 @@ describe("accessibility feedback", () => {
     expect(buildAnnouncement({ kind: "failed", message: "The input could not be read." })).toContain("The input could not be read.");
   });
 
+  it("announces a scenario load from the narrow-screen picker", () => {
+    const announcement = buildAnnouncement({ kind: "loaded", label: "Recovery claimed only" });
+
+    expect(announcement).toContain("Recovery claimed only");
+    expect(announcement).toMatch(/press verify evidence/i);
+  });
+
   it("points the focus targets at the real editor ids", () => {
     expect(EDITOR_IDS.contract).toBe("contract");
     expect(EDITOR_IDS.evidence).toBe("evidence-bundle");

@@ -30,7 +30,8 @@ export interface ErrorSummaryEntry {
 export type Announcement =
   | { kind: "started" }
   | { kind: "completed"; status: string }
-  | { kind: "failed"; message: string };
+  | { kind: "failed"; message: string }
+  | { kind: "loaded"; label: string };
 
 const FIELD_LABELS: Record<"contract" | "evidence", string> = {
   contract: "Contract",
@@ -74,6 +75,9 @@ export function buildAnnouncement(announcement: Announcement): string {
   }
   if (announcement.kind === "completed") {
     return `Verification completed. Verdict: ${announcement.status.replaceAll("_", " ")}.`;
+  }
+  if (announcement.kind === "loaded") {
+    return `Loaded the ${announcement.label} scenario into the editors. Press verify evidence to get a verdict.`;
   }
   return `Verification failed. ${announcement.message}`;
 }
