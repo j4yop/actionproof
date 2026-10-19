@@ -114,6 +114,25 @@ ActionProof verifies the evidence bundle it receives. It does not independently 
 
 Signed evidence is intentionally fail-closed until a trusted-key resolver is configured. A self-declared signature is never treated as verified.
 
+## Offline verification
+
+The verifier is a pure domain function, so the same kernel runs outside the web app — with no server, no network, and no browser:
+
+```bash
+# a contract and an evidence bundle
+npm run verify:offline -- contract.json evidence.json
+
+# an exported ActionProof bundle (manifest + contract + evidence + receipt)
+npm run verify:offline -- --bundle actionproof-bundle.zip
+
+# a { "contract": ..., "evidence": ... } payload on stdin
+npm run verify:offline -- --stdin < payload.json
+```
+
+The command prints the full machine-readable verdict and exits **0** on `PASS`, **1** on any other verdict, and **2** when the input fails schema or domain validation. It compiles the domain with `tsc` first (`npm run build:cli`), so it needs no additional runtime dependency.
+
+**What it verifies:** the supplied contract, the supplied evidence bundle, and the verifier profile it prints. **What it does not verify:** the external world, the honesty of the collector, or the origin of the trace. A verdict is a statement about evidence, not about reality.
+
 ## Local development
 
 ```bash
@@ -132,7 +151,7 @@ npm run build
 npm audit
 ```
 
-Current repository checks include **18 tests** and report **0 npm audit vulnerabilities**.
+Current repository checks include **69 tests** and report **0 npm audit vulnerabilities**.
 
 ## Built with OmniRush
 
