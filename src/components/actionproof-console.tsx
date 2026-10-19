@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { examples, getExample } from "@/domain/actionproof/examples";
 import { ContractWizard } from "@/components/contract-wizard";
+import { EvidenceExplorer } from "@/components/evidence-explorer";
 import { JudgeMode } from "@/components/judge-mode";
 import type { EvidenceBundle, VerificationResult } from "@/domain/actionproof/types";
 
@@ -347,7 +348,8 @@ function ResultPanel({ result, error, isVerifying, resultRef, stale, evidenceTex
 
   const tone = statusTone(result.status);
   const displayStale = stale || error?.code === "INPUT_CHANGED";
-  const eventMap = getEvidenceEventMap(evidenceText);
+  const evidenceEvents = getEvidenceEvents(evidenceText);
+  const eventMap = new Map(evidenceEvents.map((event) => [event.eventId, event]));
   return (
     <>
       {error && <div className="result-error-inline" role="status"><strong>{error.code}</strong><span>{error.message}</span></div>}
@@ -386,6 +388,8 @@ function ResultPanel({ result, error, isVerifying, resultRef, stale, evidenceTex
           ))}
         </div>
       </div>
+
+      <EvidenceExplorer result={result} events={evidenceEvents} />
 
       <div className="result-section result-details">
         <div className="detail-row"><span>Coverage</span><strong>{result.coverage.mode.toUpperCase()}</strong></div>
@@ -447,12 +451,12 @@ function formatValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function getEvidenceEventMap(value: string): Map<string, EvidenceBundle["events"][number]> {
+function getEvidenceEvents(value: string): EvidenceBundle["events"] {
   try {
     const parsed = JSON.parse(value) as EvidenceBundle;
-    return new Map((parsed.events ?? []).map((event) => [event.eventId, event]));
+    return Array.isArray(parsed.events) ? parsed.events : [];
   } catch {
-    return new Map();
+    return [];
   }
 }
 
