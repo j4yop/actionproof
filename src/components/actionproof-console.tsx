@@ -5,6 +5,7 @@ import { examples, getExample } from "@/domain/actionproof/examples";
 import { ContractWizard } from "@/components/contract-wizard";
 import { EvidenceExplorer } from "@/components/evidence-explorer";
 import { JudgeMode } from "@/components/judge-mode";
+import { ReceiptActions } from "@/components/receipt-actions";
 import type { EvidenceBundle, VerificationResult } from "@/domain/actionproof/types";
 
 type ApiError = {
@@ -276,7 +277,7 @@ export function ActionProofConsole() {
             </div>
           </section>
 
-          <ResultPanel result={result} error={error} isVerifying={isVerifying} resultRef={resultRef} stale={resultIsStale} evidenceText={evidenceText} />
+          <ResultPanel result={result} error={error} isVerifying={isVerifying} resultRef={resultRef} stale={resultIsStale} contractText={contractText} evidenceText={evidenceText} />
         </div>
       </section>
 
@@ -310,7 +311,7 @@ function JsonEditor({ label, description, value, onChange, lineCount, disabled, 
   );
 }
 
-function ResultPanel({ result, error, isVerifying, resultRef, stale, evidenceText }: { result: VerificationResult | null; error: ApiError | null; isVerifying: boolean; resultRef: RefObject<HTMLElement | null>; stale: boolean; evidenceText: string }) {
+function ResultPanel({ result, error, isVerifying, resultRef, stale, contractText, evidenceText }: { result: VerificationResult | null; error: ApiError | null; isVerifying: boolean; resultRef: RefObject<HTMLElement | null>; stale: boolean; contractText: string; evidenceText: string }) {
   if (isVerifying) {
     return <section className="result-panel result-loading" ref={resultRef} aria-live="polite"><span className="loading-orbit" /><p>Replaying the contract against the submitted trace.</p><small>No browser opened. No model called.</small></section>;
   }
@@ -390,6 +391,8 @@ function ResultPanel({ result, error, isVerifying, resultRef, stale, evidenceTex
       </div>
 
       <EvidenceExplorer result={result} events={evidenceEvents} />
+
+      <ReceiptActions result={result} contractText={contractText} evidenceText={evidenceText} />
 
       <div className="result-section result-details">
         <div className="detail-row"><span>Coverage</span><strong>{result.coverage.mode.toUpperCase()}</strong></div>
