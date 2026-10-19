@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { examples, getExample } from "@/domain/actionproof/examples";
+import { ContractWizard } from "@/components/contract-wizard";
 import type { EvidenceBundle, VerificationResult } from "@/domain/actionproof/types";
 
 type ApiError = {
@@ -22,6 +23,7 @@ export function ActionProofConsole() {
   const [activeExample, setActiveExample] = useState("pass");
   const [verifiedInput, setVerifiedInput] = useState<{ contract: string; evidence: string } | null>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [inputMode, setInputMode] = useState<"guided" | "expert">("guided");
   const workbenchRef = useRef<HTMLElement>(null);
   const resultRef = useRef<HTMLElement>(null);
 
@@ -129,6 +131,16 @@ export function ActionProofConsole() {
     if (result) setError({ code: "INPUT_CHANGED", message: "Inputs changed after the last verification. Run verification again before treating the result as current." });
   }
 
+  function loadContractFromWizard(contractJson: string) {
+    setContractText(contractJson);
+    setActiveExample("custom");
+    setResult(null);
+    setVerifiedInput(null);
+    setError(null);
+    setInputMode("expert");
+    scrollToWorkbench();
+  }
+
   function scrollToWorkbench() {
     workbenchRef.current?.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
   }
@@ -200,26 +212,49 @@ export function ActionProofConsole() {
 
         <div className="workspace-grid">
           <section className="input-column" aria-label="Verification inputs">
-            <JsonEditor
-              label="CONTRACT"
-              description="Expected behavior, allowed capabilities, and assertions."
-              value={contractText}
-              onChange={(value) => updateEditor("contract", value)}
-              lineCount={inputStats.contractLines}
-              disabled={isVerifying}
-              invalid={error?.field === "contract"}
-              errorMessage={error?.field === "contract" ? error.message : undefined}
-            />
-            <JsonEditor
-              label="EVIDENCE BUNDLE"
-              description="Observed events, coverage, provenance, and integrity metadata."
-              value={evidenceText}
-              onChange={(value) => updateEditor("evidence", value)}
-              lineCount={inputStats.evidenceLines}
-              disabled={isVerifying}
-              invalid={error?.field === "evidence"}
-              errorMessage={error?.field === "evidence" ? error.message : undefined}
-            />
+            <div className="mode-toggle" role="group" aria-label="Contract input mode">
+              <button className={`mode-button ${inputMode === "guided" ? "is-active" : ""}`} onClick={() => setInputMode("guided")} type="button" aria-pressed={inputMode === "guided"} disabled={isVerifying}>Guided setup</button>
+              <button className={`mode-button ${inputMode === "expert" ? "is-active" : ""}`} onClick={() => setInputMode("expert")} type="button" aria-pressed={inputMode === "expert"} disabled={isVerifying}>Expert JSON</button>
+              <span className="mode-note">{inputMode === "guided" ? "Answers compile into the contract schema." : "Raw contract and evidence, nothing hidden."}</span>
+            </div>
+            {inputMode === "guided" ? (
+              <>
+                <ContractWizard disabled={isVerifying} onLoad={loadContractFromWizard} />
+                <JsonEditor
+                  label="EVIDENCE BUNDLE"
+                  description="Observed events, coverage, provenance, and integrity metadata."
+                  value={evidenceText}
+                  onChange={(value) => updateEditor("evidence", value)}
+                  lineCount={inputStats.evidenceLines}
+                  disabled={isVerifying}
+                  invalid={error?.field === "evidence"}
+                  errorMessage={error?.field === "evidence" ? error.message : undefined}
+                />
+              </>
+            ) : (
+              <>
+                <JsonEditor
+                  label="CONTRACT"
+                  description="Expected behavior, allowed capabilities, and assertions."
+                  value={contractText}
+                  onChange={(value) => updateEditor("contract", value)}
+                  lineCount={inputStats.contractLines}
+                  disabled={isVerifying}
+                  invalid={error?.field === "contract"}
+                  errorMessage={error?.field === "contract" ? error.message : undefined}
+                />
+                <JsonEditor
+                  label="EVIDENCE BUNDLE"
+                  description="Observed events, coverage, provenance, and integrity metadata."
+                  value={evidenceText}
+                  onChange={(value) => updateEditor("evidence", value)}
+                  lineCount={inputStats.evidenceLines}
+                  disabled={isVerifying}
+                  invalid={error?.field === "evidence"}
+                  errorMessage={error?.field === "evidence" ? error.message : undefined}
+                />
+              </>
+            )}
             <div className="input-actions">
               <button className="primary-button" onClick={verifyInput} type="button" disabled={isVerifying}>
                 <span>{isVerifying ? "Evaluating evidence" : "Verify evidence"}</span>
