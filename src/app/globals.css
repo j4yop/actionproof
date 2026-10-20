@@ -3226,13 +3226,8 @@ select:focus-visible {
 }
 
 @media (max-width: 1050px) {
-  .fixture-strip {
-    max-width: 100%;
-    justify-content: start;
-  }
-}
-
-@media (max-width: 760px) {
+  /* Below this width the 14 scenarios no longer read as a scan-able index,
+     so the gallery collapses into the scenario picker. */
   .fixture-strip { display: none; }
   .scenario-picker { display: grid; }
 }
