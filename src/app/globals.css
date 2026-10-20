@@ -3189,9 +3189,10 @@ select:focus-visible {
 /* --- Scenario picker (narrow screens) --- */
 
 .scenario-picker {
-  display: none;
+  display: grid;
   gap: 8px;
-  width: 100%;
+  flex: 1 1 320px;
+  max-width: 560px;
 }
 
 .scenario-picker label {
@@ -3226,10 +3227,10 @@ select:focus-visible {
 }
 
 @media (max-width: 1050px) {
-  /* Below this width the 14 scenarios no longer read as a scan-able index,
-     so the gallery collapses into the scenario picker. */
-  .fixture-strip { display: none; }
-  .scenario-picker { display: grid; }
+  /* The index is behind a disclosure, so it is never forced open on narrow
+     screens — the picker stays the primary control at every width. */
+  .gallery-picker-row { flex-direction: column; align-items: stretch; }
+  .scenario-picker { max-width: none; }
 }
 
 /* --- Gallery band (full-width scenario index) --- */
@@ -3259,4 +3260,66 @@ select:focus-visible {
   align-items: center;
   gap: 7px;
   margin-right: 12px;
+}
+
+/* --- Gallery disclosure (primary picker + optional full index) --- */
+
+.gallery-band {
+  display: grid;
+  gap: 14px;
+}
+
+.gallery-picker-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.gallery-disclosure-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  padding: 11px 14px;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.16s, color 0.16s;
+}
+
+.gallery-disclosure-button:hover {
+  border-color: var(--cyan-strong);
+  color: var(--ink);
+}
+
+.gallery-disclosure-button .arrow-icon {
+  transition: transform 0.16s;
+}
+
+.gallery-disclosure-button[aria-expanded="true"] {
+  border-color: var(--cyan-strong);
+  color: var(--ink);
+}
+
+.gallery-disclosure-button[aria-expanded="true"] .arrow-icon {
+  transform: rotate(180deg);
+}
+
+.gallery-disclosure-count {
+  color: var(--cyan);
+  font-family: var(--mono);
+}
+
+.gallery-index[hidden] {
+  display: none;
+}
+
+.gallery-index {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 14px;
 }
