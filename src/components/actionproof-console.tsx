@@ -24,6 +24,7 @@ export function ActionProofConsole() {
   const [verifiedInput, setVerifiedInput] = useState<{ contract: string; evidence: string } | null>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [inputMode, setInputMode] = useState<"guided" | "expert">("guided");
+  const [showScenarioIndex, setShowScenarioIndex] = useState(false);
   const [announcement, setAnnouncement] = useState<string>("");
   const workbenchRef = useRef<HTMLElement>(null);
   const resultRef = useRef<HTMLElement>(null);
@@ -212,7 +213,49 @@ export function ActionProofConsole() {
         </div>
 
         <div className="gallery-band">
-          <div className="fixture-strip">
+          <div className="gallery-picker-row">
+            <div className="scenario-picker">
+              <label htmlFor="scenario-picker">
+                <span className="scenario-picker-label">SCENARIO</span>
+                <select
+                  id="scenario-picker"
+                  value={activeExample}
+                  disabled={isVerifying}
+                  onChange={(event) => {
+                    const name = event.target.value;
+                    if (!getExample(name)) return;
+                    loadExample(name);
+                    const example = getExample(name);
+                    setAnnouncement(buildAnnouncement({ kind: "loaded", label: example?.label ?? name }));
+                  }}
+                >
+                  {activeExample === "custom" && <option value="custom">Custom input</option>}
+                  {scenarioGroups().map((group) => (
+                    <optgroup key={group.family} label={group.label}>
+                      {group.options.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
+              <p className="scenario-picker-note">Loads a contract and evidence into the editors. Nothing is verified until you press verify.</p>
+            </div>
+            <button
+              className="gallery-disclosure-button"
+              type="button"
+              onClick={() => setShowScenarioIndex((current) => !current)}
+              aria-expanded={showScenarioIndex}
+              aria-controls="scenario-index"
+            >
+              <span>{showScenarioIndex ? "Hide scenario index" : "Browse all scenarios"}</span>
+              <span className="gallery-disclosure-count">{Object.keys(examples).length}</span>
+              <ChevronDown />
+            </button>
+          </div>
+
+          <div className="gallery-index" id="scenario-index" hidden={!showScenarioIndex}>
+            <div className="fixture-strip">
             {(["verified", "adversarial"] as const).map((category) => {
               const familyEntries = Object.entries(examples).filter(([, example]) => example.category === category);
               const families = [...new Set(familyEntries.map(([, example]) => example.family))];
@@ -236,34 +279,7 @@ export function ActionProofConsole() {
               );
             })}
             {activeExample === "custom" && <span className="custom-state">CUSTOM INPUT</span>}
-          </div>
-
-          <div className="scenario-picker">
-            <label htmlFor="scenario-picker">
-              <span className="scenario-picker-label">SCENARIO</span>
-              <select
-                id="scenario-picker"
-                value={activeExample}
-                disabled={isVerifying}
-                onChange={(event) => {
-                  const name = event.target.value;
-                  if (!getExample(name)) return;
-                  loadExample(name);
-                  const example = getExample(name);
-                  setAnnouncement(buildAnnouncement({ kind: "loaded", label: example?.label ?? name }));
-                }}
-              >
-                {activeExample === "custom" && <option value="custom">Custom input</option>}
-                {scenarioGroups().map((group) => (
-                  <optgroup key={group.family} label={group.label}>
-                    {group.options.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
-            <p className="scenario-picker-note">Loads a contract and evidence into the editors. Nothing is verified until you press verify.</p>
+            </div>
           </div>
         </div>
 
